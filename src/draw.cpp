@@ -251,6 +251,9 @@ SIMPLE_COLUMN(CurrentJobsColumn, "CUR", jobs.size(), 0);
 SIMPLE_COLUMN(MaxJobsColumn, "MAX", max_jobs, 0);
 SIMPLE_COLUMN(IDColumn, "ID", id, 0);
 
+static const std::string local_job_track("abcdefghijklmnopqrstuvwxyz");
+static const std::string remote_job_track("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+
 static std::vector<uint32_t> host_order;
 static std::vector<std::unique_ptr<Column> > columns;
 static guint idle_source = 0;
@@ -260,6 +263,7 @@ static int highlight_color;
 static uint32_t current_host = 0;
 static size_t current_col = 0;
 static bool sort_reversed = false;
+static bool track_jobs = false;
 
 static gboolean process_input(gint fd, GIOCondition condition, gpointer user_data)
 {
@@ -310,6 +314,10 @@ static gboolean process_input(gint fd, GIOCondition condition, gpointer user_dat
         current_col = (current_col + 1) % columns.size();
         break;
 
+    case 'T':
+        track_jobs = !track_jobs;
+        break;
+
     case ' ':
         if (cur_host != hosts.end())
             cur_host->second.expanded = !cur_host->second.expanded;
@@ -352,8 +360,21 @@ static void print_job_graph(std::map<uint32_t, Job> const &jobs, int max_jobs)
         if (h != hosts.end())
             color = h->second.getColor();
 
-        Attr c(COLOR_PAIR(color));
-        addch(j.second.is_local ? '%' : '=');
+        Attr clr(COLOR_PAIR(color));
+        char c;
+        if (track_jobs)  {
+            std::string const *s;
+            if (j.second.is_local)
+                s = &local_job_track;
+            else
+                s = &remote_job_track;
+            c = s->at(j.first % s->size());
+        } else if (j.second.is_local) {
+            c = '%';
+        } else {
+            c = '=';
+        }
+        addch(c);
 
         cnt++;
     }
