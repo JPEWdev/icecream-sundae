@@ -46,6 +46,7 @@ struct Host {
     size_t current_position = 0;
     int total_out = 0;
     int total_in = 0;
+    int total_local = 0;
 
     std::string getName() const
     {
@@ -108,7 +109,8 @@ private:
 
 extern GMainLoop *main_loop;
 extern std::map<uint32_t, Job> jobs;
-extern int total_jobs;
+extern int total_remote_jobs;
+extern int total_local_jobs;
 extern std::map<uint32_t, Host> hosts;
 extern std::string current_scheduler_name;
 extern std::string current_net_name;

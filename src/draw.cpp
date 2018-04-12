@@ -41,6 +41,7 @@ struct HostDisplayData {
     int active_jobs = 0;
     int total_in = 0;
     int total_out = 0;
+    int total_local;
     bool no_remote = false;
     std::map<uint32_t, Job> jobs;
 
@@ -247,6 +248,7 @@ SIMPLE_COLUMN(InJobsColumn, "IN", total_in, 5);
 SIMPLE_COLUMN(OutJobsColumn, "OUT", total_out, 5);
 SIMPLE_COLUMN(ActiveJobsColumn, "ACTIVE", active_jobs, 0);
 SIMPLE_COLUMN(PendingJobsColumn, "PENDING", pending_jobs, 0);
+SIMPLE_COLUMN(LocalJobsColumn, "LOCAL", total_local, 5);
 SIMPLE_COLUMN(CurrentJobsColumn, "CUR", jobs.size(), 0);
 SIMPLE_COLUMN(MaxJobsColumn, "MAX", max_jobs, 0);
 SIMPLE_COLUMN(IDColumn, "ID", id, 0);
@@ -449,6 +451,7 @@ static void do_render()
         data.max_jobs = h.second.getMaxJobs();
         data.total_in = h.second.total_in;
         data.total_out = h.second.total_out;
+        data.total_local = h.second.total_local;
 
         data.no_remote = h.second.getNoRemote();
 
@@ -491,11 +494,23 @@ static void do_render()
     move(row, 0);
     {
         Attr bold(A_BOLD);
+        addstr("Total: ");
+    }
+    {
+        std::ostringstream ss;
+        ss << "Remote:" << total_remote_jobs << " Local:" << total_local_jobs;
+        addstr(ss.str().c_str());
+    }
+    next_row();
+    move(row, 0);
+    {
+        Attr bold(A_BOLD);
         addstr("Jobs: ");
     }
     {
         std::ostringstream ss;
-        ss << "Maxiumum:" << total_job_slots << " Active:" << active_jobs << " Local:" << local_jobs << " Pending:" << pending_jobs << " Total:" << total_jobs;
+        ss << "Maxiumum:" << total_job_slots << " Active:" << active_jobs <<
+            " Local:" << local_jobs << " Pending:" << pending_jobs;
         addstr(ss.str().c_str());
     }
     next_row();
@@ -638,6 +653,7 @@ CursesMode::CursesMode()
     columns.emplace_back(std::make_unique<MaxJobsColumn>());
     columns.emplace_back(std::make_unique<JobsColumn>());
     columns.emplace_back(std::make_unique<OutJobsColumn>());
+    columns.emplace_back(std::make_unique<LocalJobsColumn>());
     columns.emplace_back(std::make_unique<ActiveJobsColumn>());
     columns.emplace_back(std::make_unique<PendingJobsColumn>());
 

@@ -32,7 +32,8 @@
 #include "scheduler.hpp"
 
 std::map<uint32_t, Job> jobs;
-int total_jobs = 0;
+int total_remote_jobs = 0;
+int total_local_jobs = 0;
 std::map<uint32_t, Host> hosts;
 GMainLoop *main_loop = nullptr;
 bool all_expanded = false;

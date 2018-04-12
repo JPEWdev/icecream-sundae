@@ -109,10 +109,8 @@ static bool process_message(MsgChannel *sched)
         job.clientid = m->hostid;
         job.is_local = true;
 
-        //TODO: Should the total include local jobs?
-        //hosts[job.hostid].total_in++;
-        //hosts[job.clientid].total_out++;
-        //total_jobs++;
+        hosts[job.clientid].total_local++;
+        total_local_jobs++;
         trigger_redraw();
         break;
     }
@@ -133,7 +131,7 @@ static bool process_message(MsgChannel *sched)
 
         hosts[job.hostid].total_in++;
         hosts[job.clientid].total_out++;
-        total_jobs++;
+        total_remote_jobs++;
         trigger_redraw();
         break;
     }
