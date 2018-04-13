@@ -31,6 +31,7 @@
 #include "main.hpp"
 #include "draw.hpp"
 #include "scheduler.hpp"
+#include "simulator.hpp"
 
 int total_remote_jobs = 0;
 int total_local_jobs = 0;
@@ -50,6 +51,7 @@ std::map<uint32_t, std::shared_ptr<Host> > Host::hosts;
 
 static std::string schedname = std::string();
 static std::string netname = std::string();
+static gboolean opt_simulate = FALSE;
 
 std::shared_ptr<Job> Job::create(uint32_t id)
 {
@@ -290,6 +292,7 @@ static bool parse_args(int *argc, char ***argv)
     {
         { "scheduler", 's', 0, G_OPTION_ARG_STRING, &opt_scheduler, "Icecream scheduler hostname" },
         { "netname", 'n', 0, G_OPTION_ARG_STRING, &opt_netname, "Icecream network name" },
+        { "simulate", 0, 0, G_OPTION_ARG_NONE, &opt_simulate, "Simulate activity" },
         { "about", 0, 0, G_OPTION_ARG_NONE, &opt_about, "Show about" },
         { "version", 0, 0, G_OPTION_ARG_NONE, &opt_version, "Show version" },
         {}
@@ -371,10 +374,11 @@ int main(int argc, char **argv)
 
     main_loop = g_main_loop_new(nullptr, false);
 
-(??)    if (opt_simulate)
-(??)        setup_simulator(netname, schedname);
-(??)    else
-(??)        connect_to_scheduler(netname, schedname);
+    if (opt_simulate)
+        scheduler = create_simulator();
+    else
+        scheduler = connect_to_scheduler(netname, schedname);
+    interface = create_ncurses_interface();
 
     int input_fd = interface->getInputFd();
     GlibSource input_source;
