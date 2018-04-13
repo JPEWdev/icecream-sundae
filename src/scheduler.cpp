@@ -108,6 +108,8 @@ static bool process_message(MsgChannel *sched)
         job.hostid = m->hostid;
         job.clientid = m->hostid;
         job.is_local = true;
+        job.filename = m->file;
+        job.start_time = g_get_monotonic_time();
 
         hosts[job.clientid].total_local++;
         total_local_jobs++;
@@ -128,6 +130,7 @@ static bool process_message(MsgChannel *sched)
 
         job.active = true;
         job.hostid = m->hostid;
+        job.start_time = g_get_monotonic_time();
 
         hosts[job.hostid].total_in++;
         hosts[job.clientid].total_out++;
@@ -148,6 +151,7 @@ static bool process_message(MsgChannel *sched)
         auto &job = jobs[m->job_id];
 
         job.clientid = m->clientid;
+        job.filename = m->filename;
         trigger_redraw();
         break;
     }

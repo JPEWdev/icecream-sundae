@@ -33,6 +33,9 @@ struct Job {
     uint32_t hostid = 0;
     bool active = false;
     bool is_local = false;
+    std::string filename;
+    int host_slot = -1;
+    guint64 start_time = 0;
 };
 
 struct Host {

@@ -31,7 +31,7 @@
 #include "main.hpp"
 #include "draw.hpp"
 
-static void print_job_graph(std::map<uint32_t, Job> const &jobs, int max_jobs);
+static void print_job_graph(std::map<uint32_t, Job*> const &jobs, int max_jobs);
 
 struct HostDisplayData {
     uint32_t id = 0;
@@ -43,7 +43,7 @@ struct HostDisplayData {
     int total_out = 0;
     int total_local;
     bool no_remote = false;
-    std::map<uint32_t, Job> jobs;
+    std::map<uint32_t, Job*> jobs;
 
     typedef std::map<uint32_t, HostDisplayData> Map;
     typedef std::vector<HostDisplayData> List;
@@ -347,18 +347,18 @@ static gboolean process_input(gint fd, GIOCondition condition, gpointer user_dat
     return TRUE;
 }
 
-static void print_job_graph(std::map<uint32_t, Job> const &jobs, int max_jobs)
+static void print_job_graph(std::map<uint32_t, Job*> const &jobs, int max_jobs)
 {
     addch('[');
 
     int cnt = 0;
 
     for (auto const j : jobs) {
-        if (!j.second.active)
+        if (!j.second->active)
             continue;
 
         int color = 0;
-        auto const h = hosts.find(j.second.clientid);
+        auto const h = hosts.find(j.second->clientid);
         if (h != hosts.end())
             color = h->second.getColor();
 
@@ -366,12 +366,12 @@ static void print_job_graph(std::map<uint32_t, Job> const &jobs, int max_jobs)
         char c;
         if (track_jobs)  {
             std::string const *s;
-            if (j.second.is_local)
+            if (j.second->is_local)
                 s = &local_job_track;
             else
                 s = &remote_job_track;
             c = s->at(j.first % s->size());
-        } else if (j.second.is_local) {
+        } else if (j.second->is_local) {
             c = '%';
         } else {
             c = '=';
@@ -400,6 +400,12 @@ static gboolean on_winch_signal(gpointer user_data)
     return TRUE;
 }
 
+static gboolean on_redraw_timer(gpointer user_data)
+{
+    trigger_redraw();
+    return TRUE;
+}
+
 static int assign_color(int *id, int fg, int bg)
 {
     int ident = *id;
@@ -418,6 +424,7 @@ static void do_render()
     int screen_cols;
     HostDisplayData::Map host_data;
     std::unordered_set<uint32_t> used_hosts;
+    std::map<uint32_t, Job*> all_jobs;
 
     getmaxyx(stdscr, screen_rows, screen_cols);
 
@@ -425,22 +432,24 @@ static void do_render()
     int active_jobs = 0;
     int local_jobs = 0;
 
-    for (auto const j : jobs) {
-        if (j.second.active) {
-            host_data[j.second.clientid].active_jobs++;
+    for (auto j : jobs) {
+        auto *job = &jobs.at(j.first);
+        if (job->active) {
+            host_data[job->clientid].active_jobs++;
             active_jobs++;
         } else {
-            host_data[j.second.clientid].pending_jobs++;
+            host_data[job->clientid].pending_jobs++;
             pending_jobs++;
         }
 
-        if (j.second.is_local)
+        if (job->is_local)
             local_jobs++;
 
-        if (j.second.hostid) {
-            host_data[j.second.hostid].jobs[j.first] = j.second;
-            used_hosts.insert(j.second.hostid);
+        if (job->hostid) {
+            host_data[job->hostid].jobs[j.first] = job;
+            used_hosts.insert(job->hostid);
         }
+        all_jobs[j.first] = job;
     }
 
     for (auto const h : hosts) {
@@ -516,7 +525,7 @@ static void do_render()
     next_row();
 
     move(row, 6);
-    print_job_graph(jobs, total_job_slots);
+    print_job_graph(all_jobs, total_job_slots);
     next_row();
     next_row();
 
@@ -578,19 +587,64 @@ static void do_render()
         move(row, 0);
         {
             Attr color(COLOR_PAIR(host.highlighted ? highlight_color : expand_color));
-            addch(hosts[id].expanded ? '-' : '+');
+            addch(host.expanded ? '-' : '+');
         }
 
         for (auto const &c: columns)
             c->output(row, data);
 
-        if (hosts[id].expanded) {
+        if (host.expanded) {
+            for (int i = 0; i < data.max_jobs; i++) {
+                next_row();
+                move(row, 2);
+                {
+                    Attr bold(A_BOLD);
+                    printw("Job %d: ", i + 1);
+                }
+
+                Job* job = nullptr;
+
+                // Find assigned job
+                for (auto j : data.jobs) {
+                    if (j.second->host_slot == i) {
+                        job = j.second;
+                        break;
+                    }
+                }
+
+                // If no existing job was found, assign a new one
+                if (!job) {
+                    for (auto j : data.jobs) {
+                        if (j.second->host_slot < 0) {
+                            job = j.second;
+                            j.second->host_slot = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (job) {
+                    printw("(%5.1lfs) ", (double)((g_get_monotonic_time() - job->start_time) / 1000000.0));
+
+                    int color = 0;
+                    auto const h = hosts.find(job->clientid);
+                    if (h != hosts.end())
+                        color = h->second.getColor();
+
+                    Attr clr(COLOR_PAIR(color));
+                    if (job->filename.empty())
+                        addstr("<unknown>");
+                    else
+                        addstr(job->filename.c_str());
+                }
+            }
+
             size_t width = 0;
-            for (auto const &a : hosts[id].attr) {
+            for (auto const &a : host.attr) {
                 width = std::max(width, a.first.size());
             }
 
-            for (auto const &a : hosts[id].attr) {
+            for (auto const &a : host.attr) {
                 next_row();
                 move(row, 2);
                 {
@@ -658,6 +712,8 @@ CursesMode::CursesMode()
     columns.emplace_back(std::make_unique<PendingJobsColumn>());
 
     g_unix_fd_add(STDIN_FILENO, G_IO_IN, process_input, main_loop);
+
+    g_timeout_add(1000, on_redraw_timer, nullptr);
 
     trigger_redraw();
 }
