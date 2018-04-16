@@ -160,9 +160,67 @@ private:
     static std::vector<int> host_color_ids;
 };
 
+class Scheduler {
+public:
+    Scheduler() {}
+    virtual ~Scheduler() {}
+
+    virtual void onInput(int c) {};
+
+    virtual std::string getNetName() const = 0;
+    virtual std::string getSchedulerName() const = 0;
+};
+
+class UserInterface {
+public:
+    UserInterface() {}
+    virtual ~UserInterface() {}
+
+    virtual void triggerRedraw() = 0;
+    virtual int processInput() = 0;
+    virtual int getInputFd() = 0;
+};
+
+class GlibSource {
+public:
+    GlibSource(): m_source(0) {}
+    GlibSource(guint source): m_source(source) {}
+
+    GlibSource& operator=(const GlibSource&) = delete;
+
+    virtual ~GlibSource()
+    {
+        remove();
+    }
+
+    guint get() const { return m_source; }
+
+    void set(guint source)
+    {
+        remove();
+        m_source = source;
+    }
+
+    void remove()
+    {
+        if (m_source) {
+            g_source_remove(m_source);
+            m_source = 0;
+        }
+    }
+
+    void clear()
+    {
+        m_source = 0;
+    }
+
+private:
+    guint m_source;
+};
+
 extern GMainLoop *main_loop;
 extern int total_remote_jobs;
 extern int total_local_jobs;
-extern std::string current_scheduler_name;
-extern std::string current_net_name;
+extern std::unique_ptr<Scheduler> scheduler;
+extern std::unique_ptr<UserInterface> interface;
 

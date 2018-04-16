@@ -19,5 +19,9 @@
 
 #pragma once
 
-void connect_to_scheduler(std::string const &netname, std::string const &schedname, bool reset = false);
+#include <memory>
+
+class Scheduler;
+
+std::unique_ptr<Scheduler> connect_to_scheduler(std::string const &netname, std::string const &schedname);
 

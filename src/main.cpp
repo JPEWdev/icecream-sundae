@@ -36,6 +36,8 @@ int total_remote_jobs = 0;
 int total_local_jobs = 0;
 GMainLoop *main_loop = nullptr;
 bool all_expanded = false;
+std::unique_ptr<Scheduler> scheduler;
+std::unique_ptr<UserInterface> interface;
 
 Job::Map Job::allJobs;
 Job::Map Job::pendingJobs;
@@ -45,9 +47,6 @@ Job::Map Job::remoteJobs;
 
 std::vector<int> Host::host_color_ids;
 std::map<uint32_t, std::shared_ptr<Host> > Host::hosts;
-
-std::string current_scheduler_name;
-std::string current_net_name;
 
 static std::string schedname = std::string();
 static std::string netname = std::string();
@@ -83,6 +82,9 @@ void Job::remove(uint32_t id)
 {
     removeTypes(id);
     removeFromMap(allJobs, id);
+
+    if (interface)
+        interface->triggerRedraw();
 }
 
 void Job::removeFromMap(Map &map, uint32_t id)
@@ -115,11 +117,13 @@ void Job::createLocal(uint32_t id, uint32_t hostid, std::string const& filename)
     if (h)
         h->total_local++;
     total_local_jobs++;
-    trigger_redraw();
 
     removeTypes(id);
     localJobs[id] = job;
     activeJobs[id] = job;
+
+    if (interface)
+        interface->triggerRedraw();
 }
 
 void Job::createPending(uint32_t id, uint32_t clientid, std::string const& filename)
@@ -128,10 +132,12 @@ void Job::createPending(uint32_t id, uint32_t clientid, std::string const& filen
 
     job->clientid = clientid;
     job->filename = filename;
-    trigger_redraw();
 
     removeTypes(id);
     pendingJobs[id] = job;
+
+    if (interface)
+        interface->triggerRedraw();
 }
 
 void Job::createRemote(uint32_t id, uint32_t hostid)
@@ -153,11 +159,13 @@ void Job::createRemote(uint32_t id, uint32_t hostid)
     if (client)
         client->total_out++;
     total_remote_jobs++;
-    trigger_redraw();
 
     removeTypes(id);
     activeJobs[id] = job;
     remoteJobs[id] = job;
+
+    if (interface)
+        interface->triggerRedraw();
 }
 
 void Job::clearAll()
@@ -200,6 +208,8 @@ std::shared_ptr<Host> Host::create(uint32_t id)
         hosts[id] = host;
     }
 
+    if (interface)
+        interface->triggerRedraw();
     return host;
 }
 
@@ -217,8 +227,11 @@ void Host::remove(uint32_t id)
 {
     auto h = hosts.find(id);
 
-    if (h != hosts.end())
+    if (h != hosts.end()) {
         hosts.erase(h);
+        if (interface)
+            interface->triggerRedraw();
+    }
 }
 
 Job::Map Host::getPendingJobs() const
@@ -335,6 +348,14 @@ static gboolean on_quit_signal(gpointer user_data)
     return TRUE;
 }
 
+static gboolean process_input(gint fd, GIOCondition condition, gpointer user_data)
+{
+    int c = interface->processInput();
+    if (c && scheduler)
+        scheduler->onInput(c);
+    return TRUE;
+}
+
 int main(int argc, char **argv)
 {
     setlocale(LC_ALL, "");
@@ -350,14 +371,24 @@ int main(int argc, char **argv)
 
     main_loop = g_main_loop_new(nullptr, false);
 
-    connect_to_scheduler(netname, schedname);
+(??)    if (opt_simulate)
+(??)        setup_simulator(netname, schedname);
+(??)    else
+(??)        connect_to_scheduler(netname, schedname);
 
-    CursesMode curses_mode;
+    int input_fd = interface->getInputFd();
+    GlibSource input_source;
 
-    g_unix_signal_add(SIGINT, reinterpret_cast<GSourceFunc>(on_quit_signal), nullptr);
-    g_unix_signal_add(SIGTERM, reinterpret_cast<GSourceFunc>(on_quit_signal), nullptr);
+    if (input_fd >= 0)
+        input_source.set(g_unix_fd_add(input_fd, G_IO_IN, process_input, nullptr));
+
+    GlibSource sigint_source(g_unix_signal_add(SIGINT, reinterpret_cast<GSourceFunc>(on_quit_signal), nullptr));
+    GlibSource sigterm_source(g_unix_signal_add(SIGTERM, reinterpret_cast<GSourceFunc>(on_quit_signal), nullptr));
 
     g_main_loop_run(main_loop);
+
+    scheduler.reset();
+    interface.reset();
 
     g_main_loop_unref(main_loop);
 

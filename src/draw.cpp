@@ -31,7 +31,46 @@
 #include "main.hpp"
 #include "draw.hpp"
 
-static void print_job_graph(Job::Map const &jobs, int max_jobs);
+class Column;
+
+class NCursesInterface: public UserInterface {
+public:
+    NCursesInterface();
+    virtual ~NCursesInterface();
+
+    virtual void triggerRedraw() override;
+    virtual int processInput() override;
+
+    virtual int getInputFd() override
+    {
+        return STDIN_FILENO;
+    }
+
+    void print_job_graph(Job::Map const &jobs, int max_jobs) const;
+
+private:
+    static gboolean on_idle_draw(gpointer user_data);
+    static gboolean on_winch_signal(gpointer user_data);
+    static gboolean on_redraw_timer(gpointer user_data);
+
+    void doRender();
+    void doRedraw();
+    int assign_color(int fg, int bg);
+
+    std::vector<uint32_t> host_order;
+    std::vector<std::unique_ptr<Column> > columns;
+    GlibSource idle_source;
+    GlibSource sigwinch_source;
+    GlibSource redraw_source;
+    int header_color;
+    int expand_color;
+    int highlight_color;
+    uint32_t current_host = 0;
+    size_t current_col = 0;
+    bool sort_reversed = false;
+    bool track_jobs = false;
+    int next_color_id = 1;
+};
 
 struct HostCache {
     typedef std::vector<std::shared_ptr<HostCache> > List;
@@ -108,7 +147,7 @@ class Column {
 
         virtual std::string getHeader() const = 0;
 
-        virtual void output(int row, const std::shared_ptr<const HostCache> host) const
+        virtual void output(NCursesInterface const* interface, int row, const std::shared_ptr<const HostCache> host) const
         {
             move(row, m_column);
             addstr(getOutputString(host).c_str());
@@ -152,7 +191,7 @@ class NameColumn: public Column {
             return "NAME";
         }
 
-        virtual void output(int row, const std::shared_ptr<const HostCache> host) const override
+        virtual void output(NCursesInterface const* interface, int row, const std::shared_ptr<const HostCache> host) const override
         {
             move(row, m_column);
             {
@@ -201,10 +240,10 @@ class JobsColumn: public Column {
             return "JOBS";
         }
 
-        virtual void output(int row, const std::shared_ptr<const HostCache> host) const override
+        virtual void output(NCursesInterface const* interface, int row, const std::shared_ptr<const HostCache> host) const override
         {
             move(row, m_column);
-            print_job_graph(host->current_jobs, host->host->getMaxJobs());
+            interface->print_job_graph(host->current_jobs, host->host->getMaxJobs());
         }
 
         virtual Compare get_compare() const override
@@ -251,21 +290,11 @@ SIMPLE_COLUMN(IDColumn, "ID", host->id, 0);
 static const std::string local_job_track("abcdefghijklmnopqrstuvwxyz");
 static const std::string remote_job_track("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
 
-static std::vector<uint32_t> host_order;
-static std::vector<std::unique_ptr<Column> > columns;
-static guint idle_source = 0;
-static int header_color;
-static int expand_color;
-static int highlight_color;
-static uint32_t current_host = 0;
-static size_t current_col = 0;
-static bool sort_reversed = false;
-static bool track_jobs = false;
-
-static gboolean process_input(gint fd, GIOCondition condition, gpointer user_data)
+int NCursesInterface::processInput()
 {
     int c = getch();
     auto cur_host = Host::find(current_host);
+    bool consumed = true;
 
     if (cur_host)
         cur_host->highlighted = false;
@@ -333,16 +362,20 @@ static gboolean process_input(gint fd, GIOCondition condition, gpointer user_dat
     case 'q':
         g_main_loop_quit(main_loop);
         break;
+
+    default:
+        consumed = false;
+        break;
     }
 
     if (current_host)
         Host::hosts.at(current_host)->highlighted = true;
 
-    trigger_redraw();
-    return TRUE;
+    triggerRedraw();
+    return consumed ? 0 : c;
 }
 
-static void print_job_graph(Job::Map const &jobs, int max_jobs)
+void NCursesInterface::print_job_graph(Job::Map const &jobs, int max_jobs) const
 {
     addch('[');
 
@@ -382,35 +415,36 @@ static void print_job_graph(Job::Map const &jobs, int max_jobs)
     addch(']');
 }
 
-static gboolean on_idle_draw(gpointer* user_data)
+gboolean NCursesInterface::on_idle_draw(gpointer user_data)
 {
-    do_redraw();
-    idle_source = 0;
+    auto *self = static_cast<NCursesInterface*>(user_data);
+    self->doRedraw();
+    self->idle_source.clear();
     return FALSE;
 }
 
-static gboolean on_winch_signal(gpointer user_data)
+gboolean NCursesInterface::on_winch_signal(gpointer user_data)
 {
-    trigger_redraw();
+    auto *self = static_cast<NCursesInterface*>(user_data);
+    self->triggerRedraw();
     return TRUE;
 }
 
-static gboolean on_redraw_timer(gpointer user_data)
+gboolean NCursesInterface::on_redraw_timer(gpointer user_data)
 {
-    trigger_redraw();
+    auto *self = static_cast<NCursesInterface*>(user_data);
+    self->triggerRedraw();
     return TRUE;
 }
 
-static int assign_color(int *id, int fg, int bg)
+int NCursesInterface::assign_color(int fg, int bg)
 {
-    int ident = *id;
-    (*id)++;
-
+    int ident = next_color_id++;
     init_pair(ident, fg, bg);
     return ident;
 }
 
-static void do_render()
+void NCursesInterface::doRender()
 {
     int total_job_slots = 0;
     int avail_servers = 0;
@@ -451,13 +485,13 @@ static void do_render()
         Attr bold(A_BOLD);
         addstr("Scheduler: ");
     }
-    addstr(current_scheduler_name.c_str());
+    addstr(scheduler->getSchedulerName().c_str());
 
     {
         Attr bold(A_BOLD);
         addstr(" Netname: ");
     }
-    addstr(current_net_name.c_str());
+    addstr(scheduler->getNetName().c_str());
     next_row();
 
 
@@ -559,7 +593,7 @@ static void do_render()
         }
 
         for (auto const &c: columns)
-            c->output(row, cache);
+            c->output(this, row, cache);
 
         if (host->expanded) {
             for (int i = 0; i < host->getMaxJobs(); i++) {
@@ -627,20 +661,21 @@ static void do_render()
     }
 }
 
-void do_redraw()
+void NCursesInterface::doRedraw()
 {
     clear();
-    do_render();
+    doRender();
     refresh();
 }
 
-void trigger_redraw()
+void NCursesInterface::triggerRedraw()
 {
-    if (!idle_source)
-        idle_source = g_idle_add(reinterpret_cast<GSourceFunc>(on_idle_draw), NULL);
+    if (!idle_source.get())
+        idle_source.set(g_idle_add(reinterpret_cast<GSourceFunc>(on_idle_draw), this));
 }
 
-CursesMode::CursesMode()
+NCursesInterface::NCursesInterface() :
+    UserInterface()
 {
     initscr();
 
@@ -653,20 +688,19 @@ CursesMode::CursesMode()
     nodelay(stdscr, TRUE);
     keypad(stdscr, TRUE);
 
-    int color_id = 1;
-    Host::addColor(assign_color(&color_id, COLOR_RED, -1));
-    Host::addColor(assign_color(&color_id, COLOR_GREEN, -1));
-    Host::addColor(assign_color(&color_id, COLOR_YELLOW, -1));
-    Host::addColor(assign_color(&color_id, COLOR_BLUE, -1));
-    Host::addColor(assign_color(&color_id, COLOR_MAGENTA, -1));
-    Host::addColor(assign_color(&color_id, COLOR_CYAN, -1));
-    Host::addColor(assign_color(&color_id, COLOR_WHITE, -1));
+    Host::addColor(assign_color(COLOR_RED, -1));
+    Host::addColor(assign_color(COLOR_GREEN, -1));
+    Host::addColor(assign_color(COLOR_YELLOW, -1));
+    Host::addColor(assign_color(COLOR_BLUE, -1));
+    Host::addColor(assign_color(COLOR_MAGENTA, -1));
+    Host::addColor(assign_color(COLOR_CYAN, -1));
+    Host::addColor(assign_color(COLOR_WHITE, -1));
 
-    header_color = assign_color(&color_id, COLOR_BLACK, COLOR_GREEN);
-    expand_color = assign_color(&color_id, COLOR_GREEN, -1);
-    highlight_color = assign_color(&color_id, COLOR_BLACK, COLOR_CYAN);
+    header_color = assign_color(COLOR_BLACK, COLOR_GREEN);
+    expand_color = assign_color(COLOR_GREEN, -1);
+    highlight_color = assign_color(COLOR_BLACK, COLOR_CYAN);
 
-    g_unix_signal_add(SIGWINCH, reinterpret_cast<GSourceFunc>(on_winch_signal), nullptr);
+    sigwinch_source.set(g_unix_signal_add(SIGWINCH, reinterpret_cast<GSourceFunc>(on_winch_signal), this));
 
     columns.emplace_back(std::make_unique<IDColumn>());
     columns.emplace_back(std::make_unique<NameColumn>());
@@ -679,14 +713,17 @@ CursesMode::CursesMode()
     columns.emplace_back(std::make_unique<ActiveJobsColumn>());
     columns.emplace_back(std::make_unique<PendingJobsColumn>());
 
-    g_unix_fd_add(STDIN_FILENO, G_IO_IN, process_input, main_loop);
+    redraw_source.set(g_timeout_add(1000, on_redraw_timer, this));
 
-    g_timeout_add(1000, on_redraw_timer, nullptr);
-
-    trigger_redraw();
+    triggerRedraw();
 }
 
-CursesMode::~CursesMode()
+NCursesInterface::~NCursesInterface()
 {
     endwin();
+}
+
+std::unique_ptr<UserInterface> create_ncurses_interface()
+{
+    return std::make_unique<NCursesInterface>();
 }

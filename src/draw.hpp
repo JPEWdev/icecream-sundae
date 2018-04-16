@@ -19,13 +19,9 @@
 
 #pragma once
 
-class CursesMode
-{
-    public:
-        CursesMode();
-        ~CursesMode();
-};
+#include <memory>
 
-void trigger_redraw();
-void do_redraw();
+class UserInterface;
+
+std::unique_ptr<UserInterface> create_ncurses_interface();
 

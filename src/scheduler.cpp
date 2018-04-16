@@ -25,25 +25,46 @@
 #include <poll.h>
 
 #include "main.hpp"
-#include "draw.hpp"
 #include "scheduler.hpp"
 
-static std::unique_ptr<MsgChannel> scheduler;
-static guint scheduler_source = 0;
+class IcecreamScheduler: public Scheduler {
+public:
+    IcecreamScheduler(std::string const &netname, std::string const &schedname) : Scheduler()
+    {
+        reconnect(netname, schedname);
+    }
 
-static bool process_message(MsgChannel *sched);
+    virtual ~IcecreamScheduler() {}
 
-static gboolean scheduler_process(gint fd, GIOCondition condition, gpointer)
+    virtual std::string getNetName() const override { return current_net_name; }
+    virtual std::string getSchedulerName() const override { return current_scheduler_name; }
+
+private:
+    static gboolean scheduler_process(gint fd, GIOCondition condition, gpointer);
+
+    bool process_message(MsgChannel *sched);
+    void discover_scheduler(std::string const &netname, std::string const &schedname);
+    void reconnect(std::string const &netname, std::string const &schedname);
+
+    std::unique_ptr<MsgChannel> scheduler = nullptr;
+    GlibSource scheduler_source;
+    std::string current_net_name;
+    std::string current_scheduler_name;
+};
+
+gboolean IcecreamScheduler::scheduler_process(gint fd, GIOCondition condition, gpointer user_data)
 {
-    while (!scheduler->read_a_bit() || scheduler->has_msg()) {
-        if (!process_message(scheduler.get()))
+    auto *self = static_cast<IcecreamScheduler*>(user_data);
+
+    while (!self->scheduler->read_a_bit() || self->scheduler->has_msg()) {
+        if (!self->process_message(self->scheduler.get()))
             break;
     }
 
     return TRUE;
 }
 
-static void discover_scheduler(std::string const &netname, std::string const &schedname)
+void IcecreamScheduler::discover_scheduler(std::string const &netname, std::string const &schedname)
 {
     if (scheduler)
         return;
@@ -93,7 +114,7 @@ static void discover_scheduler(std::string const &netname, std::string const &sc
     }
 }
 
-static bool process_message(MsgChannel *sched)
+bool IcecreamScheduler::process_message(MsgChannel *sched)
 {
     std::unique_ptr<Msg> msg(sched->get_msg());
     if (!msg)
@@ -108,7 +129,6 @@ static bool process_message(MsgChannel *sched)
     case M_JOB_LOCAL_DONE: {
         auto *m = dynamic_cast<JobLocalDoneMsg*>(msg.get());
         Job::remove(m->job_id);
-        trigger_redraw();
         break;
     }
     case M_MON_JOB_BEGIN: {
@@ -119,7 +139,6 @@ static bool process_message(MsgChannel *sched)
     case M_MON_JOB_DONE: {
         auto *m = dynamic_cast<MonJobDoneMsg*>(msg.get());
         Job::remove(m->job_id);
-        trigger_redraw();
         break;
     }
     case M_MON_GET_CS: {
@@ -146,11 +165,12 @@ static bool process_message(MsgChannel *sched)
         if (!alive)
             Host::remove(m->hostid);
 
-        trigger_redraw();
+        if (interface)
+            interface->triggerRedraw();
         break;
     }
     case M_END:
-        connect_to_scheduler(current_net_name, current_scheduler_name, true);
+        reconnect(current_net_name, current_scheduler_name);
         break;
     default:
         break;
@@ -159,22 +179,23 @@ static bool process_message(MsgChannel *sched)
     return true;
 }
 
-void connect_to_scheduler(std::string const &netname, std::string const &schedname, bool reset)
+void IcecreamScheduler::reconnect(std::string const &netname, std::string const &schedname)
 {
-    if (reset)
-        scheduler.reset();
+    scheduler.reset();
+    scheduler_source.remove();
 
     discover_scheduler(netname, schedname);
 
-    if (scheduler_source) {
-        g_source_remove(scheduler_source);
-        scheduler_source = 0;
-    }
-
     if (scheduler)
-        scheduler_source = g_unix_fd_add(scheduler->fd, G_IO_IN, scheduler_process, nullptr);
+        scheduler_source.set(g_unix_fd_add(scheduler->fd, G_IO_IN, scheduler_process, this));
 
-    trigger_redraw();
+    if (interface)
+        interface->triggerRedraw();
 }
 
+
+std::unique_ptr<Scheduler> connect_to_scheduler(std::string const &netname, std::string const &schedname)
+{
+    return std::make_unique<IcecreamScheduler>(netname, schedname);
+}
 
