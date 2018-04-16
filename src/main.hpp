@@ -100,7 +100,12 @@ struct Host {
 
     size_t getMaxJobs() const
     {
-        return getIntAttr<size_t>("MaxJobs");
+        return getNumberAttr<size_t>("MaxJobs");
+    }
+
+    double getSpeed() const
+    {
+        return getNumberAttr<double>("Speed");
     }
 
     bool getNoRemote() const
@@ -136,7 +141,7 @@ private:
     }
 
     template <typename T>
-    T getIntAttr(std::string const &name, T dflt = 0) const
+    T getNumberAttr(std::string const &name, T dflt = 0) const
     {
         auto const i = attr.find(name);
         if (i == attr.end())

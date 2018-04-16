@@ -23,6 +23,7 @@
 #include <map>
 #include <memory>
 #include <unordered_set>
+#include <iomanip>
 
 #include <glib.h>
 #include <glib-unix.h>
@@ -268,7 +269,7 @@ class JobsColumn: public Column {
         protected: \
             virtual std::string getOutputString(const std::shared_ptr<const HostCache> host) const override \
             { \
-                std::ostringstream ss; ss << host->_attr; return ss.str(); \
+                std::ostringstream ss; ss << std::setprecision(6) << host->_attr; return ss.str(); \
             } \
             virtual size_t getMinWidth() const override { return _min_width; } \
         private: \
@@ -286,6 +287,7 @@ SIMPLE_COLUMN(LocalJobsColumn, "LOCAL", host->total_local, 5);
 SIMPLE_COLUMN(CurrentJobsColumn, "CUR", current_jobs.size(), 0);
 SIMPLE_COLUMN(MaxJobsColumn, "MAX", host->getMaxJobs(), 0);
 SIMPLE_COLUMN(IDColumn, "ID", host->id, 0);
+SIMPLE_COLUMN(SpeedColumn, "SPEED", host->getSpeed(), 0);
 
 static const std::string local_job_track("abcdefghijklmnopqrstuvwxyz");
 static const std::string remote_job_track("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
@@ -712,6 +714,7 @@ NCursesInterface::NCursesInterface() :
     columns.emplace_back(std::make_unique<LocalJobsColumn>());
     columns.emplace_back(std::make_unique<ActiveJobsColumn>());
     columns.emplace_back(std::make_unique<PendingJobsColumn>());
+    columns.emplace_back(std::make_unique<SpeedColumn>());
 
     redraw_source.set(g_timeout_add(1000, on_redraw_timer, this));
 
