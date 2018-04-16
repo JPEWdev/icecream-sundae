@@ -290,11 +290,11 @@ static bool parse_args(int *argc, char ***argv)
 
     static const GOptionEntry opts[] =
     {
-        { "scheduler", 's', 0, G_OPTION_ARG_STRING, &opt_scheduler, "Icecream scheduler hostname" },
-        { "netname", 'n', 0, G_OPTION_ARG_STRING, &opt_netname, "Icecream network name" },
-        { "simulate", 0, 0, G_OPTION_ARG_NONE, &opt_simulate, "Simulate activity" },
-        { "about", 0, 0, G_OPTION_ARG_NONE, &opt_about, "Show about" },
-        { "version", 0, 0, G_OPTION_ARG_NONE, &opt_version, "Show version" },
+        { "scheduler", 's', 0, G_OPTION_ARG_STRING, &opt_scheduler, "Icecream scheduler hostname", NULL },
+        { "netname", 'n', 0, G_OPTION_ARG_STRING, &opt_netname, "Icecream network name", NULL },
+        { "simulate", 0, 0, G_OPTION_ARG_NONE, &opt_simulate, "Simulate activity", NULL },
+        { "about", 0, 0, G_OPTION_ARG_NONE, &opt_about, "Show about", NULL },
+        { "version", 0, 0, G_OPTION_ARG_NONE, &opt_version, "Show version", NULL },
         {}
     };
 
@@ -345,13 +345,13 @@ static bool parse_args(int *argc, char ***argv)
     return true;
 }
 
-static gboolean on_quit_signal(gpointer user_data)
+static gboolean on_quit_signal(gpointer)
 {
     g_main_loop_quit(main_loop);
     return TRUE;
 }
 
-static gboolean process_input(gint fd, GIOCondition condition, gpointer user_data)
+static gboolean process_input(gint, GIOCondition, gpointer)
 {
     int c = interface->processInput();
     if (c && scheduler)

@@ -52,7 +52,7 @@ private:
     std::string current_scheduler_name;
 };
 
-gboolean IcecreamScheduler::scheduler_process(gint fd, GIOCondition condition, gpointer user_data)
+gboolean IcecreamScheduler::scheduler_process(gint, GIOCondition, gpointer user_data)
 {
     auto *self = static_cast<IcecreamScheduler*>(user_data);
 

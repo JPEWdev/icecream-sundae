@@ -147,7 +147,7 @@ class Column {
 
         virtual std::string getHeader() const = 0;
 
-        virtual void output(NCursesInterface const* interface, int row, const std::shared_ptr<const HostCache> host) const
+        virtual void output(NCursesInterface const*, int row, const std::shared_ptr<const HostCache> host) const
         {
             move(row, m_column);
             addstr(getOutputString(host).c_str());
@@ -191,7 +191,7 @@ class NameColumn: public Column {
             return "NAME";
         }
 
-        virtual void output(NCursesInterface const* interface, int row, const std::shared_ptr<const HostCache> host) const override
+        virtual void output(NCursesInterface const*, int row, const std::shared_ptr<const HostCache> host) const override
         {
             move(row, m_column);
             {

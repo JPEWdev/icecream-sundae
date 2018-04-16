@@ -166,7 +166,7 @@ public:
     Scheduler() {}
     virtual ~Scheduler() {}
 
-    virtual void onInput(int c) {};
+    virtual void onInput(int) {};
 
     virtual std::string getNetName() const = 0;
     virtual std::string getSchedulerName() const = 0;
