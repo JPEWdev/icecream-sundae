@@ -596,7 +596,7 @@ void NCursesInterface::doRender()
             c->output(this, row, cache);
 
         if (host->expanded) {
-            for (int i = 0; i < host->getMaxJobs(); i++) {
+            for (size_t i = 0; i < host->getMaxJobs(); i++) {
                 next_row();
                 move(row, 2);
                 {
@@ -617,7 +617,7 @@ void NCursesInterface::doRender()
                 // If no existing job was found, assign a new one
                 if (!job) {
                     for (auto j : cache->current_jobs) {
-                        if (j.second->host_slot < 0) {
+                        if (j.second->host_slot == SIZE_MAX) {
                             job = j.second;
                             j.second->host_slot = i;
                             break;

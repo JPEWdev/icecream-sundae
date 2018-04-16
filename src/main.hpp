@@ -43,7 +43,7 @@ struct Job {
     bool active = false;
     bool is_local = false;
     std::string filename;
-    int host_slot = -1;
+    size_t host_slot = SIZE_MAX;
     guint64 start_time = 0;
 
     std::shared_ptr<Host> getClient() const;
@@ -98,9 +98,9 @@ struct Host {
         return getStringAttr("Name");
     }
 
-    int getMaxJobs() const
+    size_t getMaxJobs() const
     {
-        return getIntAttr("MaxJobs");
+        return getIntAttr<size_t>("MaxJobs");
     }
 
     bool getNoRemote() const
@@ -135,13 +135,14 @@ private:
         return i->second;
     }
 
-    int getIntAttr(std::string const &name, int dflt = 0) const
+    template <typename T>
+    T getIntAttr(std::string const &name, T dflt = 0) const
     {
         auto const i = attr.find(name);
         if (i == attr.end())
             return dflt;
 
-        int val;
+        T val;
         std::istringstream(i->second) >> val;
         return val;
     }
