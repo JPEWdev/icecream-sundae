@@ -31,22 +31,15 @@
 #include "main.hpp"
 #include "draw.hpp"
 
-static void print_job_graph(std::map<uint32_t, Job*> const &jobs, int max_jobs);
+static void print_job_graph(Job::Map const &jobs, int max_jobs);
 
-struct HostDisplayData {
-    uint32_t id = 0;
-    std::string name;
-    int max_jobs = 0;
-    int pending_jobs = 0;
-    int active_jobs = 0;
-    int total_in = 0;
-    int total_out = 0;
-    int total_local;
-    bool no_remote = false;
-    std::map<uint32_t, Job*> jobs;
+struct HostCache {
+    typedef std::vector<std::shared_ptr<HostCache> > List;
 
-    typedef std::map<uint32_t, HostDisplayData> Map;
-    typedef std::vector<HostDisplayData> List;
+    std::shared_ptr<Host> host;
+    Job::Map pending_jobs;
+    Job::Map active_jobs;
+    Job::Map current_jobs;
 };
 
 class Attr {
@@ -98,16 +91,16 @@ class Attr {
 
 class Column {
     public:
-        typedef bool (*Compare)(HostDisplayData const &, HostDisplayData const &);
+        typedef bool (*Compare)(const std::shared_ptr<const HostCache>, const std::shared_ptr<const HostCache>);
 
         virtual ~Column() {}
 
-        virtual size_t getWidth(HostDisplayData::Map const &host_data) const
+        virtual size_t getWidth(HostCache::List const &hosts) const
         {
             size_t max_width = std::max(getHeader().size(), getMinWidth());
 
-            for (auto const h : host_data) {
-                std::string s = getOutputString(h.second);
+            for (auto const h : hosts) {
+                std::string s = getOutputString(h);
                 max_width = std::max(max_width, s.size());
             }
             return max_width;
@@ -115,10 +108,10 @@ class Column {
 
         virtual std::string getHeader() const = 0;
 
-        virtual void output(int row, HostDisplayData const &data) const
+        virtual void output(int row, const std::shared_ptr<const HostCache> host) const
         {
             move(row, m_column);
-            addstr(getOutputString(data).c_str());
+            addstr(getOutputString(host).c_str());
         }
 
         void setColumn(int col)
@@ -136,7 +129,7 @@ class Column {
     protected:
         Column() {}
 
-        virtual std::string getOutputString(HostDisplayData const &) const
+        virtual std::string getOutputString(const std::shared_ptr<const HostCache>) const
         {
             return "";
         }
@@ -147,7 +140,6 @@ class Column {
         }
 
         int m_column;
-
 };
 
 class NameColumn: public Column {
@@ -160,12 +152,12 @@ class NameColumn: public Column {
             return "NAME";
         }
 
-        virtual void output(int row, HostDisplayData const &data) const override
+        virtual void output(int row, const std::shared_ptr<const HostCache> host) const override
         {
             move(row, m_column);
             {
-                Attr attr(COLOR_PAIR(hosts[data.id].getColor()) | ( data.no_remote ? A_UNDERLINE : 0 ));
-                addstr(getOutputString(data).c_str());
+                Attr attr(COLOR_PAIR(host->host->getColor()) | ( host->host->getNoRemote() ? A_UNDERLINE : 0 ));
+                addstr(getOutputString(host).c_str());
             }
         }
 
@@ -175,17 +167,17 @@ class NameColumn: public Column {
         }
 
     protected:
-        virtual std::string getOutputString(HostDisplayData const &data) const override
+        virtual std::string getOutputString(const std::shared_ptr<const HostCache> host) const override
         {
             std::ostringstream ss;
-            ss << data.name;
+            ss << host->host->getName();
             return ss.str();
         }
 
     private:
-        static bool compare(HostDisplayData const &a, HostDisplayData const &b)
+        static bool compare(const std::shared_ptr<const HostCache> a, const std::shared_ptr<const HostCache> b)
         {
-            return a.name < b.name;
+            return a->host->getName() < b->host->getName();
         }
 };
 
@@ -194,12 +186,12 @@ class JobsColumn: public Column {
         JobsColumn() : Column() {}
         virtual ~JobsColumn() {}
 
-        virtual size_t getWidth(HostDisplayData::Map const &host_data) const override
+        virtual size_t getWidth(HostCache::List const &hosts) const override
         {
             size_t max_width = getHeader().size();
 
-            for (auto const h : host_data)
-                max_width = std::max(max_width, static_cast<size_t>(h.second.max_jobs) + 2);
+            for (auto const h : hosts)
+                max_width = std::max(max_width, static_cast<size_t>(h->host->getMaxJobs()) + 2);
 
             return max_width;
         }
@@ -209,10 +201,10 @@ class JobsColumn: public Column {
             return "JOBS";
         }
 
-        virtual void output(int row, HostDisplayData const &data) const override
+        virtual void output(int row, const std::shared_ptr<const HostCache> host) const override
         {
             move(row, m_column);
-            print_job_graph(data.jobs, data.max_jobs);
+            print_job_graph(host->current_jobs, host->host->getMaxJobs());
         }
 
         virtual Compare get_compare() const override
@@ -221,9 +213,9 @@ class JobsColumn: public Column {
         }
 
     private:
-        static bool compare(HostDisplayData const &a, HostDisplayData const &b)
+        static bool compare(const std::shared_ptr<const HostCache> a, const std::shared_ptr<const HostCache> b)
         {
-            return a.jobs.size() < b.jobs.size();
+            return a->current_jobs.size() < b->current_jobs.size();
         }
 };
 
@@ -235,23 +227,26 @@ class JobsColumn: public Column {
             virtual std::string getHeader() const override { return _header; } \
             virtual Compare get_compare() const override { return compare; } \
         protected: \
-            virtual std::string getOutputString(HostDisplayData const &data) const override \
+            virtual std::string getOutputString(const std::shared_ptr<const HostCache> host) const override \
             { \
-                std::ostringstream ss; ss << data._attr; return ss.str(); \
+                std::ostringstream ss; ss << host->_attr; return ss.str(); \
             } \
             virtual size_t getMinWidth() const override { return _min_width; } \
         private: \
-            static bool compare(HostDisplayData const &a, HostDisplayData const &b) { return a._attr < b._attr; } \
+            static bool compare(const std::shared_ptr<const HostCache> a, const std::shared_ptr<const HostCache> b) \
+            { \
+                return a->_attr < b->_attr; \
+            } \
     }
 
-SIMPLE_COLUMN(InJobsColumn, "IN", total_in, 5);
-SIMPLE_COLUMN(OutJobsColumn, "OUT", total_out, 5);
-SIMPLE_COLUMN(ActiveJobsColumn, "ACTIVE", active_jobs, 0);
-SIMPLE_COLUMN(PendingJobsColumn, "PENDING", pending_jobs, 0);
-SIMPLE_COLUMN(LocalJobsColumn, "LOCAL", total_local, 5);
-SIMPLE_COLUMN(CurrentJobsColumn, "CUR", jobs.size(), 0);
-SIMPLE_COLUMN(MaxJobsColumn, "MAX", max_jobs, 0);
-SIMPLE_COLUMN(IDColumn, "ID", id, 0);
+SIMPLE_COLUMN(InJobsColumn, "IN", host->total_in, 5);
+SIMPLE_COLUMN(OutJobsColumn, "OUT", host->total_out, 5);
+SIMPLE_COLUMN(ActiveJobsColumn, "ACTIVE", active_jobs.size(), 0);
+SIMPLE_COLUMN(PendingJobsColumn, "PENDING", pending_jobs.size(), 0);
+SIMPLE_COLUMN(LocalJobsColumn, "LOCAL", host->total_local, 5);
+SIMPLE_COLUMN(CurrentJobsColumn, "CUR", current_jobs.size(), 0);
+SIMPLE_COLUMN(MaxJobsColumn, "MAX", host->getMaxJobs(), 0);
+SIMPLE_COLUMN(IDColumn, "ID", host->id, 0);
 
 static const std::string local_job_track("abcdefghijklmnopqrstuvwxyz");
 static const std::string remote_job_track("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
@@ -270,19 +265,19 @@ static bool track_jobs = false;
 static gboolean process_input(gint fd, GIOCondition condition, gpointer user_data)
 {
     int c = getch();
-    auto cur_host = hosts.find(current_host);
+    auto cur_host = Host::find(current_host);
 
-    if (cur_host == hosts.end())
-        current_host = 0;
+    if (cur_host)
+        cur_host->highlighted = false;
     else
-        hosts.at(current_host).highlighted = false;
+        current_host = 0;
 
     switch(c) {
     case KEY_UP:
     case 'k':
-        if (cur_host != hosts.end()) {
-            if (cur_host->second.current_position > 0) {
-                current_host = host_order[cur_host->second.current_position - 1];
+        if (cur_host) {
+            if (cur_host->current_position > 0) {
+                current_host = host_order[cur_host->current_position - 1];
             }
         } else {
             current_host = host_order[0];
@@ -291,9 +286,9 @@ static gboolean process_input(gint fd, GIOCondition condition, gpointer user_dat
 
     case KEY_DOWN:
     case 'j':
-        if (cur_host != hosts.end()) {
-            if (cur_host->second.current_position < host_order.size() - 1) {
-                current_host = host_order[cur_host->second.current_position + 1];
+        if (cur_host) {
+            if (cur_host->current_position < host_order.size() - 1) {
+                current_host = host_order[cur_host->current_position + 1];
             }
         } else {
             current_host = host_order[0];
@@ -321,14 +316,14 @@ static gboolean process_input(gint fd, GIOCondition condition, gpointer user_dat
         break;
 
     case ' ':
-        if (cur_host != hosts.end())
-            cur_host->second.expanded = !cur_host->second.expanded;
+        if (cur_host)
+            cur_host->expanded = !cur_host->expanded;
         break;
 
     case 'a':
         all_expanded = !all_expanded;
-        for (auto &h : hosts)
-            h.second.expanded = all_expanded;
+        for (auto h : Host::hosts)
+            h.second->expanded = all_expanded;
         break;
 
     case 'r':
@@ -341,13 +336,13 @@ static gboolean process_input(gint fd, GIOCondition condition, gpointer user_dat
     }
 
     if (current_host)
-        hosts.at(current_host).highlighted = true;
+        Host::hosts.at(current_host)->highlighted = true;
 
     trigger_redraw();
     return TRUE;
 }
 
-static void print_job_graph(std::map<uint32_t, Job*> const &jobs, int max_jobs)
+static void print_job_graph(Job::Map const &jobs, int max_jobs)
 {
     addch('[');
 
@@ -358,9 +353,9 @@ static void print_job_graph(std::map<uint32_t, Job*> const &jobs, int max_jobs)
             continue;
 
         int color = 0;
-        auto const h = hosts.find(j.second->clientid);
-        if (h != hosts.end())
-            color = h->second.getColor();
+        auto const h = j.second->getClient();
+        if (h)
+            color = h->getColor();
 
         Attr clr(COLOR_PAIR(color));
         char c;
@@ -422,52 +417,30 @@ static void do_render()
 
     int screen_rows;
     int screen_cols;
-    HostDisplayData::Map host_data;
     std::unordered_set<uint32_t> used_hosts;
-    std::map<uint32_t, Job*> all_jobs;
 
     getmaxyx(stdscr, screen_rows, screen_cols);
 
-    int pending_jobs = 0;
-    int active_jobs = 0;
-    int local_jobs = 0;
+    HostCache::List host_cache;
 
-    for (auto j : jobs) {
-        auto *job = &jobs.at(j.first);
-        if (job->active) {
-            host_data[job->clientid].active_jobs++;
-            active_jobs++;
-        } else {
-            host_data[job->clientid].pending_jobs++;
-            pending_jobs++;
+    for (auto j : Job::allJobs) {
+        if (j.second->getHost()) {
+            used_hosts.insert(j.second->getHost()->id);
         }
-
-        if (job->is_local)
-            local_jobs++;
-
-        if (job->hostid) {
-            host_data[job->hostid].jobs[j.first] = job;
-            used_hosts.insert(job->hostid);
-        }
-        all_jobs[j.first] = job;
     }
 
-    for (auto const h : hosts) {
-        auto &data = host_data[h.first];
-
-        data.id = h.first;
-        data.name = h.second.getName();
-        data.max_jobs = h.second.getMaxJobs();
-        data.total_in = h.second.total_in;
-        data.total_out = h.second.total_out;
-        data.total_local = h.second.total_local;
-
-        data.no_remote = h.second.getNoRemote();
-
-        if (!h.second.getNoRemote()) {
+    for (auto const h : Host::hosts) {
+        if (!h.second->getNoRemote()) {
             avail_servers++;
-            total_job_slots += data.max_jobs;
+            total_job_slots += h.second->getMaxJobs();
         }
+        auto c = std::make_shared<HostCache>();
+        c->host = h.second;
+        c->pending_jobs = c->host->getPendingJobs();
+        c->active_jobs = c->host->getActiveJobs();
+        c->current_jobs = c->host->getCurrentJobs();
+
+        host_cache.push_back(c);
     }
 
     int row = 0;
@@ -495,7 +468,7 @@ static void do_render()
     }
     {
         std::ostringstream ss;
-        ss << "Total:" << hosts.size() << " Available:" << avail_servers << " Active:" << used_hosts.size();
+        ss << "Total:" << Host::hosts.size() << " Available:" << avail_servers << " Active:" << used_hosts.size();
         addstr(ss.str().c_str());
     }
     next_row();
@@ -518,14 +491,14 @@ static void do_render()
     }
     {
         std::ostringstream ss;
-        ss << "Maxiumum:" << total_job_slots << " Active:" << active_jobs <<
-            " Local:" << local_jobs << " Pending:" << pending_jobs;
+        ss << "Maxiumum:" << total_job_slots << " Active:" << Job::activeJobs.size() <<
+            " Local:" << Job::localJobs.size() << " Pending:" << Job::pendingJobs.size();
         addstr(ss.str().c_str());
     }
     next_row();
 
     move(row, 6);
-    print_job_graph(all_jobs, total_job_slots);
+    print_job_graph(Job::allJobs, total_job_slots);
     next_row();
     next_row();
 
@@ -541,7 +514,7 @@ static void do_render()
         int col = 2;
         for (size_t i = 0; i < columns.size(); i++) {
             auto &c = columns[i];
-            size_t width = c->getWidth(host_data);
+            size_t width = c->getWidth(host_cache);
             c->setColumn(col);
 
             if (current_col == i) {
@@ -561,40 +534,35 @@ static void do_render()
     }
     next_row();
 
-    HostDisplayData::List sorted_host_data;
-    for (auto const &h : host_data)
-        sorted_host_data.emplace_back(h.second);
-
     if (current_col < columns.size()) {
         auto compare = columns[current_col]->get_compare();
         if (sort_reversed)
-            std::sort(sorted_host_data.rbegin(), sorted_host_data.rend(), compare);
+            std::sort(host_cache.rbegin(), host_cache.rend(), compare);
         else
-            std::sort(sorted_host_data.begin(), sorted_host_data.end(), compare);
+            std::sort(host_cache.begin(), host_cache.end(), compare);
     }
 
     host_order.clear();
 
-    for (auto &data : sorted_host_data) {
-        auto const id = data.id;
-        auto &host = hosts[id];
-        if (!data.id)
+    for (auto cache: host_cache) {
+        auto &host = cache->host;
+        if (!host->id)
             continue;
 
-        host.current_position = host_order.size();
-        host_order.push_back(id);
+        host->current_position = host_order.size();
+        host_order.push_back(host->id);
 
         move(row, 0);
         {
-            Attr color(COLOR_PAIR(host.highlighted ? highlight_color : expand_color));
-            addch(host.expanded ? '-' : '+');
+            Attr color(COLOR_PAIR(host->highlighted ? highlight_color : expand_color));
+            addch(host->expanded ? '-' : '+');
         }
 
         for (auto const &c: columns)
-            c->output(row, data);
+            c->output(row, cache);
 
-        if (host.expanded) {
-            for (int i = 0; i < data.max_jobs; i++) {
+        if (host->expanded) {
+            for (int i = 0; i < host->getMaxJobs(); i++) {
                 next_row();
                 move(row, 2);
                 {
@@ -602,10 +570,10 @@ static void do_render()
                     printw("Job %d: ", i + 1);
                 }
 
-                Job* job = nullptr;
+                std::shared_ptr<Job> job;
 
                 // Find assigned job
-                for (auto j : data.jobs) {
+                for (auto j : cache->current_jobs) {
                     if (j.second->host_slot == i) {
                         job = j.second;
                         break;
@@ -614,7 +582,7 @@ static void do_render()
 
                 // If no existing job was found, assign a new one
                 if (!job) {
-                    for (auto j : data.jobs) {
+                    for (auto j : cache->current_jobs) {
                         if (j.second->host_slot < 0) {
                             job = j.second;
                             j.second->host_slot = i;
@@ -627,9 +595,9 @@ static void do_render()
                     printw("(%5.1lfs) ", (double)((g_get_monotonic_time() - job->start_time) / 1000000.0));
 
                     int color = 0;
-                    auto const h = hosts.find(job->clientid);
-                    if (h != hosts.end())
-                        color = h->second.getColor();
+                    auto const h = job->getClient();
+                    if (h)
+                        color = h->getColor();
 
                     Attr clr(COLOR_PAIR(color));
                     if (job->filename.empty())
@@ -640,11 +608,11 @@ static void do_render()
             }
 
             size_t width = 0;
-            for (auto const &a : host.attr) {
+            for (auto const &a : host->attr) {
                 width = std::max(width, a.first.size());
             }
 
-            for (auto const &a : host.attr) {
+            for (auto const &a : host->attr) {
                 next_row();
                 move(row, 2);
                 {

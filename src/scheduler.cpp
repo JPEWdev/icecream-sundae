@@ -52,8 +52,8 @@ static void discover_scheduler(std::string const &netname, std::string const &sc
 
     scheduler.reset(discover->try_get_scheduler());
 
-    hosts.clear();
-    jobs.clear();
+    Host::hosts.clear();
+    Job::clearAll();
     current_scheduler_name.clear();
     current_net_name.clear();
 
@@ -102,61 +102,34 @@ static bool process_message(MsgChannel *sched)
     switch (msg->type) {
     case M_MON_LOCAL_JOB_BEGIN: {
         auto *m = dynamic_cast<MonLocalJobBeginMsg*>(msg.get());
-        auto &job = jobs[m->job_id];
-
-        job.active = true;
-        job.hostid = m->hostid;
-        job.clientid = m->hostid;
-        job.is_local = true;
-        job.filename = m->file;
-        job.start_time = g_get_monotonic_time();
-
-        hosts[job.clientid].total_local++;
-        total_local_jobs++;
-        trigger_redraw();
+        Job::createLocal(m->job_id, m->hostid, m->file);
         break;
     }
     case M_JOB_LOCAL_DONE: {
         auto *m = dynamic_cast<JobLocalDoneMsg*>(msg.get());
-        auto job = jobs.find(m->job_id);
-        if (job != jobs.end())
-            jobs.erase(job);
+        Job::remove(m->job_id);
         trigger_redraw();
         break;
     }
     case M_MON_JOB_BEGIN: {
         auto *m = dynamic_cast<MonJobBeginMsg*>(msg.get());
-        auto &job = jobs[m->job_id];
-
-        job.active = true;
-        job.hostid = m->hostid;
-        job.start_time = g_get_monotonic_time();
-
-        hosts[job.hostid].total_in++;
-        hosts[job.clientid].total_out++;
-        total_remote_jobs++;
-        trigger_redraw();
+        Job::createRemote(m->job_id, m->hostid);
         break;
     }
     case M_MON_JOB_DONE: {
         auto *m = dynamic_cast<MonJobDoneMsg*>(msg.get());
-        auto job = jobs.find(m->job_id);
-        if (job != jobs.end())
-            jobs.erase(job);
+        Job::remove(m->job_id);
         trigger_redraw();
         break;
     }
     case M_MON_GET_CS: {
         auto *m = dynamic_cast<MonGetCSMsg*>(msg.get());
-        auto &job = jobs[m->job_id];
-
-        job.clientid = m->clientid;
-        job.filename = m->filename;
-        trigger_redraw();
+        Job::createPending(m->job_id, m->clientid, m->filename);
         break;
     }
     case M_MON_STATS: {
         auto *m = dynamic_cast<MonStatsMsg*>(msg.get());
+        auto host = Host::create(m->hostid);
 
         std::stringstream ss(m->statmsg);
         std::string key;
@@ -167,11 +140,11 @@ static bool process_message(MsgChannel *sched)
             if (key == "Name")
                 alive = true;
 
-            hosts[m->hostid].attr[key] = value;
+            host->attr[key] = value;
         }
 
         if (!alive)
-            hosts.erase(m->hostid);
+            Host::remove(m->hostid);
 
         trigger_redraw();
         break;

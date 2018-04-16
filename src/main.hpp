@@ -21,6 +21,7 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 #include <sstream>
@@ -28,7 +29,15 @@
 
 extern bool all_expanded;
 
+struct Host;
+
 struct Job {
+    typedef std::map<uint32_t, std::shared_ptr<Job> > Map;
+    typedef std::vector<std::shared_ptr<Job> > List;
+
+    virtual ~Job() {}
+
+    const uint32_t id;
     uint32_t clientid = 0;
     uint32_t hostid = 0;
     bool active = false;
@@ -36,13 +45,42 @@ struct Job {
     std::string filename;
     int host_slot = -1;
     guint64 start_time = 0;
+
+    std::shared_ptr<Host> getClient() const;
+    std::shared_ptr<Host> getHost() const;
+
+    static std::shared_ptr<Job> find(uint32_t id);
+    static void remove(uint32_t id);
+
+    static void createLocal(uint32_t id, uint32_t hostid, std::string const& filename);
+    static void createPending(uint32_t id, uint32_t clientid, std::string const& filename);
+    static void createRemote(uint32_t id, uint32_t hostid);
+    static void clearAll();
+
+    static Map allJobs;
+    static Map pendingJobs;
+    static Map activeJobs;
+    static Map localJobs;
+    static Map remoteJobs;
+
+protected:
+    Job(uint32_t jobid) : id(jobid) {}
+
+private:
+    static std::shared_ptr<Job> create(uint32_t id);
+    static void removeFromMap(Map &map, uint32_t id);
+    static void removeTypes(uint32_t id);
 };
 
 struct Host {
-    Host() : expanded(all_expanded)
-        {}
+    typedef std::map<uint32_t, std::shared_ptr<Host> > Map;
+    typedef std::vector<std::shared_ptr<Host> > List;
+
     typedef std::map<std::string, std::string> Attributes;
 
+    virtual ~Host() {}
+
+    const uint32_t id;
     Attributes attr;
     bool expanded;
     bool highlighted = false;
@@ -50,6 +88,10 @@ struct Host {
     int total_out = 0;
     int total_in = 0;
     int total_local = 0;
+
+    Job::Map getPendingJobs() const;
+    Job::Map getActiveJobs() const;
+    Job::Map getCurrentJobs() const;
 
     std::string getName() const
     {
@@ -76,6 +118,14 @@ struct Host {
         host_color_ids.push_back(ident);
     }
 
+    static std::shared_ptr<Host> create(uint32_t id);
+    static std::shared_ptr<Host> find(uint32_t id);
+    static void remove(uint32_t id);
+    static Map hosts;
+
+protected:
+    Host(uint32_t hostid) : id(hostid), expanded(all_expanded)
+        {}
 private:
     std::string getStringAttr(std::string const &name, std::string const &dflt = "") const
     {
@@ -111,10 +161,8 @@ private:
 };
 
 extern GMainLoop *main_loop;
-extern std::map<uint32_t, Job> jobs;
 extern int total_remote_jobs;
 extern int total_local_jobs;
-extern std::map<uint32_t, Host> hosts;
 extern std::string current_scheduler_name;
 extern std::string current_net_name;
 
