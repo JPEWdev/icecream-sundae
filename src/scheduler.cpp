@@ -18,6 +18,7 @@
  */
 
 #include <memory>
+#include <iostream>
 
 #include <glib.h>
 #include <glib-unix.h>
