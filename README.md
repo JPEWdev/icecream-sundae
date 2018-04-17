@@ -1,20 +1,35 @@
 # icecream-sundae
-Commandline Monitor for Icecream
+Commandline Monitor for [Icecream](https://github.com/icecc/icecream).
 
 # Building
 
+## Prerequsites
+* [ncurses](https://www.gnu.org/software/ncurses/ncurses.html)
+* [glib](https://developer.gnome.org/glib/stable/) >= 2.0
+* [Icecream](https://github.com/icecc/icecream)
+* [meson](http://mesonbuild.com/)
+* [ninja](https://ninja-build.org/)
+
+### Fedora
+`dnf install dnf install glib2-devel ncurses-devel icecream-devel meson ninja-build`
+
+### Debian/Ubuntu
+`apt-get install ninja-build meson libncursesw5-dev libicecc-dev libglib2.0-dev`
+
+## Compiling
 To build icecream-sundae, download the latest release, extract it, then run:
 ```
-mkdir build
-cd build
-meson ..
+mkdir builddir
+cd builddir
+meson .. --buildtype release
 ninja
 sudo -E ninja install
 ```
 
 # Running
 
-For help, run `icecream-sundae --help`
+Simply running `icecream-sundae` should be sufficent. Without any arguements, the program will try to
+discover the default scheduler. For help, run `icecream-sundae --help`
 
 ## Display
 
@@ -26,7 +41,7 @@ The following table describes the columns that are shown for each compile node
 | Column        | Description                                                                       |
 |---------------|-----------------------------------------------------------------------------------|
 | `ID`          | The unique ID for the node, as assigned by the scheduler                          |
-| `NAME`        | The Name of the node. Each node is assigned a color based on a hash of its string name. Nodes that cannot accept remote jobs (i.e. have the "NoRemote" property set to "true")  are displayed underlined. |
+| `NAME`        | The Name of the node. Each node is assigned a color based on a hash of its string name. Nodes that cannot accept remote jobs (i.e. have the "NoRemote" property set to "true") are displayed underlined. |
 | `IN`          | The total number of jobs this node has compiled for other nodes                   |
 | `CUR`         | The current number of jobs this node is compiling                                 |
 | `MAX`         | The maximum number of jobs the node can compile at once                           |
