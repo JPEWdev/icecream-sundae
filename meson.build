@@ -1,6 +1,10 @@
-project('icecream-sundae', 'cpp')
-
-version = '1.0.0'
+project('icecream-sundae', 'cpp',
+        version: '0.99.0',
+        default_options: [
+            'buildtype=debugoptimized',
+            'cpp_std=c++14',
+            'warning_level=3',
+            ])
 
 icecc = dependency('icecc')
 glib = dependency('glib-2.0')
@@ -29,7 +33,7 @@ if not cxx.links(code, dependencies: [icecc, libdl], name: 'libicecc C++11 compa
 endif
 
 conf_data = configuration_data()
-conf_data.set('version', version)
+conf_data.set('version', meson.project_version())
 configure_file(input: 'config.h.in', output: 'config.h', configuration: conf_data)
 
 executable('icecream-sundae', ['src/main.cpp', 'src/draw.cpp',
