@@ -1,6 +1,7 @@
 FROM fedora:latest
 
 RUN dnf -y install \
+    clang \
     gcc-c++ \
     glib2-devel \
     icecream-devel \

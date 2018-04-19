@@ -1,6 +1,7 @@
 FROM ubuntu:latest
 
 RUN apt-get -y update && apt-get -y install \
+    clang \
     g++ \
     libglib2.0-dev \
     libicecc-dev \
