@@ -7,7 +7,10 @@ RUN apt-get -y update && apt-get -y install \
     libicecc-dev \
     libncursesw5-dev \
     meson \
+    python3-pip \
     ninja-build
+
+RUN pip3 install meson
 
 RUN mkdir -p /root/icecream-sundae/builddir
 COPY . /root/icecream-sundae/

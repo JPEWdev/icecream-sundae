@@ -5,6 +5,8 @@ RUN dnf -y install \
     gcc-c++ \
     glib2-devel \
     icecream-devel \
+    libasan \
+    libubsan \
     meson \
     ncurses-devel \
     ninja-build

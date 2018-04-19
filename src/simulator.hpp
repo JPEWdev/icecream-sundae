@@ -23,5 +23,5 @@
 
 class Scheduler;
 
-std::unique_ptr<Scheduler> create_simulator(std::uint_fast32_t seed = 1234567);
+std::unique_ptr<Scheduler> create_simulator(std::uint_fast32_t seed = 1234567, int cycles = -1, int speed = 20);
 

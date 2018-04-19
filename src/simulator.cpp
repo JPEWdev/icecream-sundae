@@ -26,11 +26,10 @@
 #define MAX_HOSTS (10)
 #define MAX_JOBS (100)
 #define MAX_HOST_JOBS (20)
-#define SIM_INTERVAL (20)
 
 class Simulator: public Scheduler {
 public:
-    Simulator(std::uint_fast32_t seed);
+    Simulator(std::uint_fast32_t seed, int cycles, int speed);
     virtual ~Simulator() {}
 
     virtual std::string getNetName() const override { return "ICECREAM"; }
@@ -39,7 +38,7 @@ public:
 private:
     static gboolean process_simulator(gpointer user_data);
 
-    void onTimer();
+    void doCycle();
 
     void addHost();
     void removeHost();
@@ -61,6 +60,7 @@ private:
     uint32_t next_host_id = 1;
     uint32_t next_job_id = 1;
     uint32_t source_host = 0;
+    int remaining_cycles;
 
     struct Action {
         uint32_t weight;
@@ -81,17 +81,17 @@ const Simulator::Action Simulator::actionTable[] = {
 gboolean Simulator::process_simulator(gpointer user_data)
 {
     auto *self = static_cast<Simulator*>(user_data);
-    self->onTimer();
+    self->doCycle();
     return TRUE;
 }
 
-Simulator::Simulator(std::uint_fast32_t seed):
-    Scheduler(), random_generator(seed)
+Simulator::Simulator(std::uint_fast32_t seed, int cycles, int speed):
+    Scheduler(), random_generator(seed), remaining_cycles(cycles)
 {
     for (int i = 0; i < MAX_HOSTS; i++)
         addHost();
 
-    timer_source.set(g_timeout_add(SIM_INTERVAL, process_simulator, this));
+    timer_source.set(g_timeout_add(speed, process_simulator, this));
 }
 
 template<typename T>
@@ -153,7 +153,7 @@ std::shared_ptr<Host> Simulator::getSourceHost()
     return host;
 }
 
-void Simulator::onTimer()
+void Simulator::doCycle()
 {
     uint32_t total_weight = 0;
     for (auto const &a : actionTable)
@@ -170,6 +170,11 @@ void Simulator::onTimer()
         }
         r -= a.weight;
     }
+
+    if (remaining_cycles == 0)
+        g_main_loop_quit(main_loop);
+    else if (remaining_cycles > 0)
+        remaining_cycles--;
 }
 
 void Simulator::addPendingJob()
@@ -230,8 +235,8 @@ Host::Map Simulator::getAvailableHosts(uint32_t except) const
     return result;
 }
 
-std::unique_ptr<Scheduler> create_simulator(std::uint_fast32_t seed)
+std::unique_ptr<Scheduler> create_simulator(std::uint_fast32_t seed, int cycles, int speed)
 {
-    return std::make_unique<Simulator>(seed);
+    return std::make_unique<Simulator>(seed, cycles, speed);
 }
 

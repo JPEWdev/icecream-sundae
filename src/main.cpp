@@ -52,6 +52,9 @@ std::map<uint32_t, std::shared_ptr<Host> > Host::hosts;
 static std::string schedname = std::string();
 static std::string netname = std::string();
 static gboolean opt_simulate = FALSE;
+static gint opt_sim_seed = 12345;
+static gint opt_sim_cycles = -1;
+static gint opt_sim_speed = 20;
 
 std::shared_ptr<Job> Job::create(uint32_t id)
 {
@@ -293,6 +296,9 @@ static bool parse_args(int *argc, char ***argv)
         { "scheduler", 's', 0, G_OPTION_ARG_STRING, &opt_scheduler, "Icecream scheduler hostname", NULL },
         { "netname", 'n', 0, G_OPTION_ARG_STRING, &opt_netname, "Icecream network name", NULL },
         { "simulate", 0, 0, G_OPTION_ARG_NONE, &opt_simulate, "Simulate activity", NULL },
+        { "sim-seed", 0, 0, G_OPTION_ARG_INT, &opt_sim_seed, "Simulator seed", NULL },
+        { "sim-cycles", 0, 0, G_OPTION_ARG_INT, &opt_sim_cycles, "Number of simulator cycles to run. -1 for no limit", NULL },
+        { "sim-speed", 0, 0, G_OPTION_ARG_INT, &opt_sim_speed, "Simulator speed (milliseconds between cycles)", NULL },
         { "about", 0, 0, G_OPTION_ARG_NONE, &opt_about, "Show about", NULL },
         { "version", 0, 0, G_OPTION_ARG_NONE, &opt_version, "Show version", NULL },
         {}
@@ -375,7 +381,7 @@ int main(int argc, char **argv)
     main_loop = g_main_loop_new(nullptr, false);
 
     if (opt_simulate)
-        scheduler = create_simulator();
+        scheduler = create_simulator(opt_sim_seed, opt_sim_cycles, opt_sim_speed);
     else
         scheduler = connect_to_scheduler(netname, schedname);
     interface = create_ncurses_interface();

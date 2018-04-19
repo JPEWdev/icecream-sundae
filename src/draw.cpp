@@ -702,7 +702,8 @@ NCursesInterface::NCursesInterface() :
     expand_color = assign_color(COLOR_GREEN, -1);
     highlight_color = assign_color(COLOR_BLACK, COLOR_CYAN);
 
-    sigwinch_source.set(g_unix_signal_add(SIGWINCH, reinterpret_cast<GSourceFunc>(on_winch_signal), this));
+    if (glib_check_version(2, 54, 0) == NULL)
+        sigwinch_source.set(g_unix_signal_add(SIGWINCH, reinterpret_cast<GSourceFunc>(on_winch_signal), this));
 
     columns.emplace_back(std::make_unique<IDColumn>());
     columns.emplace_back(std::make_unique<NameColumn>());

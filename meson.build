@@ -4,6 +4,7 @@ project('icecream-sundae', 'cpp',
             'buildtype=debugoptimized',
             'cpp_std=c++14',
             'warning_level=3',
+            'b_ndebug=if-release',
             ])
 
 icecc = dependency('icecc')
@@ -36,9 +37,16 @@ conf_data = configuration_data()
 conf_data.set('version', meson.project_version())
 configure_file(input: 'config.h.in', output: 'config.h', configuration: conf_data)
 
-executable('icecream-sundae', ['src/main.cpp', 'src/draw.cpp',
-        'src/scheduler.cpp', 'src/simulator.cpp'],
+icecream_sundae = executable('icecream-sundae',
+    ['src/main.cpp', 'src/draw.cpp', 'src/scheduler.cpp', 'src/simulator.cpp'],
     include_directories: incdir,
     dependencies: [icecc, glib, ncurses, libdl],
     install : true
+    )
+
+# A pretty dumb test right now. Simply run the simulator with a known key for a
+# fixed number of iterations and see if anything breaks
+test('Random simulator test', icecream_sundae, is_parallel: false,
+    args: ['--simulate', '--sim-seed=123456', '--sim-cycles=10000', '--sim-speed=1'],
+    env: ['ASAN_OPTIONS=detect_leaks=1:leak_check_at_exit=true:verbosity=1', 'TERM=dumb'],
     )

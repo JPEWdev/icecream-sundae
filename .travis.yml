@@ -18,8 +18,8 @@ before_install:
     - docker build -t icecream-sundae-$TEST_OS -f .travis/$TEST_OS/Dockerfile .
 
 script:
-    - docker run icecream-sundae-$TEST_OS /bin/sh -c "CC=$CC CXX=$CXX
-        meson .. &&
+    - docker run --rm icecream-sundae-$TEST_OS /bin/sh -c "CC=$CC CXX=$CXX
+        meson -Dwerror=true -Db_sanitize=address,undefined .. &&
         ninja &&
         ninja test &&
         ninja install"
