@@ -1,6 +1,8 @@
 # icecream-sundae
 Commandline Monitor for [Icecream](https://github.com/icecc/icecream).
 
+[![Build Status](https://travis-ci.org/JPEWdev/icecream-sundae.svg?branch=master)](https://travis-ci.org/JPEWdev/icecream-sundae)
+
 # Building
 
 ## Prerequsites
@@ -11,7 +13,7 @@ Commandline Monitor for [Icecream](https://github.com/icecc/icecream).
 * [ninja](https://ninja-build.org/)
 
 ### Fedora
-`dnf install dnf install glib2-devel ncurses-devel icecream-devel meson ninja-build`
+`dnf install gcc-c++ glib2-devel icecream-devel meson ncurses-devel ninja-build`
 
 ### Debian/Ubuntu
 `apt-get install ninja-build meson libncursesw5-dev libicecc-dev libglib2.0-dev`
