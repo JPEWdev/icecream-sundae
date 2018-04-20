@@ -1,2 +1,4 @@
 .git/
 .travis/
+builddir/
+build/

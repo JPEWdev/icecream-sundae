@@ -13,6 +13,7 @@ env:
     - TEST_OS=fedora-latest
     - TEST_OS=ubuntu-rolling
     - TEST_OS=ubuntu-latest
+    - TEST_OS=ubuntu-trusty
 
 before_install:
     - docker build -t icecream-sundae-$TEST_OS -f .travis/$TEST_OS/Dockerfile .
