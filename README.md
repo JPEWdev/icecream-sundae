@@ -2,6 +2,7 @@
 Commandline Monitor for [Icecream](https://github.com/icecc/icecream).
 
 [![Build Status](https://travis-ci.org/JPEWdev/icecream-sundae.svg?branch=master)](https://travis-ci.org/JPEWdev/icecream-sundae)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/9e75106b1701452488d361efe2d1ad88)](https://www.codacy.com/app/JPEWdev/icecream-sundae?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=JPEWdev/icecream-sundae&amp;utm_campaign=Badge_Grade)
 
 # Building
 
