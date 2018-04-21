@@ -20,7 +20,7 @@ before_install:
 
 script:
     - docker run --rm icecream-sundae-$TEST_OS /bin/sh -c "CC=$CC CXX=$CXX
-        meson -Dwerror=true -Db_sanitize=address,undefined .. &&
+        meson -Db_ndebug=false -Dwerror=true -Db_sanitize=address,undefined .. &&
         ninja &&
         ninja test &&
         ninja install"

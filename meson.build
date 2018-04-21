@@ -1,10 +1,11 @@
 project('icecream-sundae', 'cpp',
         version: '0.99.0',
+        meson_version: '>= 0.31.0',
         default_options: [
             'buildtype=debugoptimized',
             'cpp_std=c++14',
             'warning_level=3',
-            'b_ndebug=if-release',
+            'b_ndebug=true',
             ])
 
 icecc = dependency('icecc')
