@@ -10,9 +10,9 @@ services:
     - docker
 
 env:
-    - TEST_OS=fedora-latest
-    - TEST_OS=ubuntu-rolling
-    - TEST_OS=ubuntu-latest
+    - TEST_OS=fedora-27
+    - TEST_OS=ubuntu-artful
+    - TEST_OS=ubuntu-xenial
     - TEST_OS=ubuntu-trusty
 
 before_install:
