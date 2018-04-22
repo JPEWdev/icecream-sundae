@@ -60,7 +60,7 @@ std::shared_ptr<Job> Job::create(uint32_t id)
 {
     class RealJob: public Job {
     public:
-        RealJob(uint32_t id): Job(id) {}
+        explicit RealJob(uint32_t id): Job(id) {}
         virtual ~RealJob() {}
     };
 
@@ -202,7 +202,7 @@ std::shared_ptr<Host> Host::create(uint32_t id)
 {
     class RealHost: public Host {
     public:
-        RealHost(uint32_t id): Host(id) {}
+        explicit RealHost(uint32_t id): Host(id) {}
         virtual ~RealHost() {}
     };
 

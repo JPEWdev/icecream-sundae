@@ -64,7 +64,7 @@ struct Job {
     static Map remoteJobs;
 
 protected:
-    Job(uint32_t jobid) : id(jobid) {}
+    explicit Job(uint32_t jobid) : id(jobid) {}
 
 private:
     static std::shared_ptr<Job> create(uint32_t id);
@@ -129,7 +129,7 @@ struct Host {
     static Map hosts;
 
 protected:
-    Host(uint32_t hostid) : id(hostid), expanded(all_expanded)
+    explicit Host(uint32_t hostid) : id(hostid), expanded(all_expanded)
         {}
 private:
     std::string getStringAttr(std::string const &name, std::string const &dflt = "") const
@@ -190,7 +190,7 @@ public:
 class GlibSource {
 public:
     GlibSource(): m_source(0) {}
-    GlibSource(guint source): m_source(source) {}
+    explicit GlibSource(guint source) : m_source(source) {}
 
     GlibSource& operator=(const GlibSource&) = delete;
 

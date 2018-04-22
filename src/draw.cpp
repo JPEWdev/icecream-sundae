@@ -131,7 +131,7 @@ class Attr {
 
 class Column {
     public:
-        typedef bool (*Compare)(const std::shared_ptr<const HostCache>, const std::shared_ptr<const HostCache>);
+        typedef bool (*Compare)(const std::shared_ptr<const HostCache> &, const std::shared_ptr<const HostCache> &);
 
         virtual ~Column() {}
 
@@ -148,7 +148,7 @@ class Column {
 
         virtual std::string getHeader() const = 0;
 
-        virtual void output(NCursesInterface const*, int row, const std::shared_ptr<const HostCache> host) const
+        virtual void output(NCursesInterface const*, int row, const std::shared_ptr<const HostCache> &host) const
         {
             move(row, m_column);
             addstr(getOutputString(host).c_str());
@@ -169,7 +169,7 @@ class Column {
     protected:
         Column() {}
 
-        virtual std::string getOutputString(const std::shared_ptr<const HostCache>) const
+        virtual std::string getOutputString(const std::shared_ptr<const HostCache> &) const
         {
             return "";
         }
@@ -179,7 +179,7 @@ class Column {
             return 0;
         }
 
-        int m_column;
+        int m_column = -1;
 };
 
 class NameColumn: public Column {
@@ -192,7 +192,7 @@ class NameColumn: public Column {
             return "NAME";
         }
 
-        virtual void output(NCursesInterface const*, int row, const std::shared_ptr<const HostCache> host) const override
+        virtual void output(NCursesInterface const*, int row, const std::shared_ptr<const HostCache> &host) const override
         {
             move(row, m_column);
             {
@@ -207,7 +207,7 @@ class NameColumn: public Column {
         }
 
     protected:
-        virtual std::string getOutputString(const std::shared_ptr<const HostCache> host) const override
+        virtual std::string getOutputString(const std::shared_ptr<const HostCache> &host) const override
         {
             std::ostringstream ss;
             ss << host->host->getName();
@@ -215,7 +215,7 @@ class NameColumn: public Column {
         }
 
     private:
-        static bool compare(const std::shared_ptr<const HostCache> a, const std::shared_ptr<const HostCache> b)
+        static bool compare(const std::shared_ptr<const HostCache> &a, const std::shared_ptr<const HostCache> &b)
         {
             return a->host->getName() < b->host->getName();
         }
@@ -241,7 +241,7 @@ class JobsColumn: public Column {
             return "JOBS";
         }
 
-        virtual void output(NCursesInterface const* interface, int row, const std::shared_ptr<const HostCache> host) const override
+        virtual void output(NCursesInterface const* interface, int row, const std::shared_ptr<const HostCache> &host) const override
         {
             move(row, m_column);
             interface->print_job_graph(host->current_jobs, host->host->getMaxJobs());
@@ -253,7 +253,7 @@ class JobsColumn: public Column {
         }
 
     private:
-        static bool compare(const std::shared_ptr<const HostCache> a, const std::shared_ptr<const HostCache> b)
+        static bool compare(const std::shared_ptr<const HostCache> &a, const std::shared_ptr<const HostCache> &b)
         {
             return a->current_jobs.size() < b->current_jobs.size();
         }
@@ -267,13 +267,13 @@ class JobsColumn: public Column {
             virtual std::string getHeader() const override { return _header; } \
             virtual Compare get_compare() const override { return compare; } \
         protected: \
-            virtual std::string getOutputString(const std::shared_ptr<const HostCache> host) const override \
+            virtual std::string getOutputString(const std::shared_ptr<const HostCache> &host) const override \
             { \
                 std::ostringstream ss; ss << std::setprecision(6) << host->_attr; return ss.str(); \
             } \
             virtual size_t getMinWidth() const override { return _min_width; } \
         private: \
-            static bool compare(const std::shared_ptr<const HostCache> a, const std::shared_ptr<const HostCache> b) \
+            static bool compare(const std::shared_ptr<const HostCache> &a, const std::shared_ptr<const HostCache> &b) \
             { \
                 return a->_attr < b->_attr; \
             } \
