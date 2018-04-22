@@ -14,10 +14,22 @@ Commandline Monitor for [Icecream](https://github.com/icecc/icecream).
 * [ninja](https://ninja-build.org/)
 
 ### Fedora
-`dnf install gcc-c++ glib2-devel icecream-devel meson ncurses-devel ninja-build`
+```shell
+sudo dnf install gcc-c++ glib2-devel icecream-devel meson ncurses-devel ninja-build
+```
 
-### Debian/Ubuntu
-`apt-get install ninja-build meson libncursesw5-dev libicecc-dev libglib2.0-dev`
+### Ubuntu 17.10 & Later
+```shell
+sudo apt-get install g++ libglib2.0-dev libicecc-dev libncursesw5-dev meson ninja-build
+```
+
+### Ubuntu 14.04
+This version of Ubuntu requires a newer version of meson:
+
+```shell
+sudo apt-get install g++ libglib2.0-dev libicecc-dev libncursesw5-dev meson python3-pip ninja-build
+pip3 install --user meson
+```
 
 ## Compiling
 To build icecream-sundae, download the latest release, extract it, then run:
@@ -28,6 +40,8 @@ meson .. --buildtype release
 ninja
 sudo -E ninja install
 ```
+
+*Note* For Ubuntu 14.04, you may need to run `meson` as `~/.local/bin/meson`
 
 # Running
 
