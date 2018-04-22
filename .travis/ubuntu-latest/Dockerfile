@@ -10,7 +10,8 @@ RUN apt-get -y update && apt-get -y install \
     python3-pip \
     ninja-build
 
-RUN pip3 install meson
+RUN pip3 install --user meson
+ENV PATH="/root/.local/bin:${PATH}"
 
 RUN mkdir -p /root/icecream-sundae/builddir
 COPY . /root/icecream-sundae/
