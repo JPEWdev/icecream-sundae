@@ -13,22 +13,40 @@ Commandline Monitor for [Icecream](https://github.com/icecc/icecream).
 * [meson](http://mesonbuild.com/)
 * [ninja](https://ninja-build.org/)
 
-### Fedora
+### Fedora 27
 ```shell
 sudo dnf install gcc-c++ glib2-devel icecream-devel meson ncurses-devel ninja-build
 ```
 
-### Ubuntu 17.10 & Later
+### Ubuntu 17.10 (Artful Aardvark)
 ```shell
 sudo apt-get install g++ libglib2.0-dev libicecc-dev libncursesw5-dev meson ninja-build
 ```
 
-### Ubuntu 14.04
+### Ubuntu 16.04 (Xenial Xerus)
 This version of Ubuntu requires a newer version of meson:
 
 ```shell
 sudo apt-get install g++ libglib2.0-dev libicecc-dev libncursesw5-dev meson python3-pip ninja-build
 pip3 install --user meson
+```
+
+### Ubuntu 14.04 (Trusty Tahr)
+While it is possible to install on this ancient version of Ubuntu, it requires a lot of work:
+
+```shell
+sudo add-apt-repository ppa:jonathonf/python-3.5
+sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+sudo add-apt-repository ppa:jonathonf/binutils
+
+sudo apt-get install g++-6 libglib2.0-dev libicecc-dev libncursesw5-dev python3-pip python3.5 wget unzip
+
+wget https://github.com/ninja-build/ninja/releases/download/v1.8.2/ninja-linux.zip -O ninja-linux.zip
+sudo unzip ninja-linux.zip -d /usr/local/bin
+
+python3.5 -m pip install --user meson
+
+export CXX=g++-6
 ```
 
 ## Compiling
@@ -41,7 +59,7 @@ ninja
 sudo -E ninja install
 ```
 
-*Note* For Ubuntu 14.04, you may need to run `meson` as `~/.local/bin/meson`
+*Note:* For Ubuntu 16.04 & 14.04, you may need to run `meson` as `~/.local/bin/meson`
 
 # Running
 

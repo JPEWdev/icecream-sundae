@@ -24,7 +24,8 @@ RUN apt-get -y update && apt-get -y --force-yes install binutils
 RUN update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-6 100
 RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.8 100
 
-RUN python3.5 -m pip install meson
+RUN python3.5 -m pip install --user meson
+ENV PATH="/root/.local/bin:${PATH}"
 
 # Install pre-built ninja
 RUN wget https://github.com/ninja-build/ninja/releases/download/v1.8.2/ninja-linux.zip -O ninja-linux.zip
