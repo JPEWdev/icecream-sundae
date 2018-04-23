@@ -39,6 +39,8 @@ sudo add-apt-repository ppa:jonathonf/python-3.5
 sudo add-apt-repository ppa:ubuntu-toolchain-r/test
 sudo add-apt-repository ppa:jonathonf/binutils
 
+sudo apt-get update
+
 sudo apt-get install g++-6 libglib2.0-dev libicecc-dev libncursesw5-dev python3-pip python3.5 wget unzip
 
 wget https://github.com/ninja-build/ninja/releases/download/v1.8.2/ninja-linux.zip -O ninja-linux.zip
