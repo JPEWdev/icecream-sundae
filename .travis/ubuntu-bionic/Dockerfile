@@ -1,4 +1,4 @@
-FROM ubuntu:artful
+FROM ubuntu:bionic
 
 RUN apt-get -y update && apt-get -y install \
     clang \

@@ -10,17 +10,19 @@ services:
     - docker
 
 env:
-    - TEST_OS=fedora-27
-    - TEST_OS=ubuntu-artful
-    - TEST_OS=ubuntu-xenial
-    - TEST_OS=ubuntu-trusty
+    - TEST_OS=fedora-28 SANITIZE=address,undefined
+    - TEST_OS=fedora-27 SANITIZE=address,undefined
+    - TEST_OS=ubuntu-bionic SANITIZE=address,undefined
+    - TEST_OS=ubuntu-artful SANITIZE=address,undefined
+    - TEST_OS=ubuntu-xenial SANITIZE=address,undefined
+    - TEST_OS=ubuntu-trusty SANITIZE=none
 
 before_install:
     - docker build -t icecream-sundae-$TEST_OS -f .travis/$TEST_OS/Dockerfile .
 
 script:
     - docker run --rm icecream-sundae-$TEST_OS /bin/sh -c "CC=$CC CXX=$CXX
-        meson -Db_ndebug=false -Dwerror=true -Db_sanitize=address,undefined .. &&
+        meson -Db_ndebug=false -Dwerror=true -Db_sanitize=$SANITIZE .. &&
         ninja &&
         ninja test &&
         ninja install"

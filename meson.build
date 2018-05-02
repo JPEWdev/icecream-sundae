@@ -13,7 +13,29 @@ glib = dependency('glib-2.0')
 ncurses = dependency('ncursesw')
 
 cxx = meson.get_compiler('cpp')
+
 libdl = cxx.find_library('dl')
+
+deps = [icecc, glib, ncurses, libdl]
+
+code = '''
+#include <icecc/comm.h>
+
+int main(int argc, char **argv)
+{
+    std::string net = "net";
+    std::string sched = "sched";
+    auto p = new DiscoverSched(net, 0, sched);
+    (void)p;
+    return 0;
+}
+'''
+if not cxx.links(code, dependencies: deps, name: 'libicecc links dynamically')
+    icecc = dependency('icecc', static: true)
+    liblzo2 = cxx.find_library('lzo2')
+    libcapng = dependency('libcap-ng')
+    deps += [libcapng, liblzo2]
+endif
 
 incdir = include_directories('src')
 
@@ -30,7 +52,7 @@ int main(int argc, char **argv) {
 }
 '''
 
-if not cxx.links(code, dependencies: [icecc, libdl], name: 'libicecc C++11 compatability')
+if not cxx.links(code, dependencies: deps, name: 'libicecc C++11 compatability')
     add_global_arguments('-D_GLIBCXX_USE_CXX11_ABI=0', language: 'cpp')
 endif
 
@@ -41,7 +63,7 @@ configure_file(input: 'config.h.in', output: 'config.h', configuration: conf_dat
 icecream_sundae = executable('icecream-sundae',
     ['src/main.cpp', 'src/draw.cpp', 'src/scheduler.cpp', 'src/simulator.cpp'],
     include_directories: incdir,
-    dependencies: [icecc, glib, ncurses, libdl],
+    dependencies: deps,
     install : true
     )
 
