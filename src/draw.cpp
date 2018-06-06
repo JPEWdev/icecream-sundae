@@ -51,7 +51,6 @@ public:
 
 private:
     static gboolean on_idle_draw(gpointer user_data);
-    static gboolean on_winch_signal(gpointer user_data);
     static gboolean on_redraw_timer(gpointer user_data);
 
     void doRender();
@@ -61,7 +60,6 @@ private:
     std::vector<uint32_t> host_order;
     std::vector<std::unique_ptr<Column> > columns;
     GlibSource idle_source;
-    GlibSource sigwinch_source;
     GlibSource redraw_source;
     int header_color;
     int expand_color;
@@ -425,13 +423,6 @@ gboolean NCursesInterface::on_idle_draw(gpointer user_data)
     return FALSE;
 }
 
-gboolean NCursesInterface::on_winch_signal(gpointer user_data)
-{
-    auto *self = static_cast<NCursesInterface*>(user_data);
-    self->triggerRedraw();
-    return TRUE;
-}
-
 gboolean NCursesInterface::on_redraw_timer(gpointer user_data)
 {
     auto *self = static_cast<NCursesInterface*>(user_data);
@@ -701,9 +692,6 @@ NCursesInterface::NCursesInterface() :
     header_color = assign_color(COLOR_BLACK, COLOR_GREEN);
     expand_color = assign_color(COLOR_GREEN, -1);
     highlight_color = assign_color(COLOR_BLACK, COLOR_CYAN);
-
-    if (glib_check_version(2, 54, 0) == NULL)
-        sigwinch_source.set(g_unix_signal_add(SIGWINCH, reinterpret_cast<GSourceFunc>(on_winch_signal), this));
 
     columns.emplace_back(std::make_unique<IDColumn>());
     columns.emplace_back(std::make_unique<NameColumn>());
