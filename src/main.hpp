@@ -123,6 +123,11 @@ struct Host {
         host_color_ids.push_back(ident);
     }
 
+    static void clearColors()
+    {
+        host_color_ids.clear();
+    }
+
     static std::shared_ptr<Host> create(uint32_t id);
     static std::shared_ptr<Host> find(uint32_t id);
     static void remove(uint32_t id);
@@ -185,6 +190,8 @@ public:
     virtual void triggerRedraw() = 0;
     virtual int processInput() = 0;
     virtual int getInputFd() = 0;
+    virtual void suspend() = 0;
+    virtual void resume() = 0;
 };
 
 class GlibSource {

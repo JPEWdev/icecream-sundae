@@ -47,12 +47,16 @@ public:
         return STDIN_FILENO;
     }
 
+    virtual void suspend() override;
+    virtual void resume() override;
+
     void print_job_graph(Job::Map const &jobs, int max_jobs) const;
 
 private:
     static gboolean on_idle_draw(gpointer user_data);
     static gboolean on_redraw_timer(gpointer user_data);
 
+    void init();
     void doRender();
     void doRedraw();
     int assign_color(int fg, int bg);
@@ -375,6 +379,19 @@ int NCursesInterface::processInput()
     return consumed ? 0 : c;
 }
 
+void NCursesInterface::suspend()
+{
+    clear();
+    refresh();
+    endwin();
+    redraw_source.clear();
+}
+
+void NCursesInterface::resume()
+{
+    init();
+}
+
 void NCursesInterface::print_job_graph(Job::Map const &jobs, int max_jobs) const
 {
     addch('[');
@@ -667,8 +684,7 @@ void NCursesInterface::triggerRedraw()
         idle_source.set(g_idle_add(reinterpret_cast<GSourceFunc>(on_idle_draw), this));
 }
 
-NCursesInterface::NCursesInterface() :
-    UserInterface()
+void NCursesInterface::init()
 {
     initscr();
 
@@ -681,6 +697,7 @@ NCursesInterface::NCursesInterface() :
     nodelay(stdscr, TRUE);
     keypad(stdscr, TRUE);
 
+    Host::clearColors();
     Host::addColor(assign_color(COLOR_RED, -1));
     Host::addColor(assign_color(COLOR_GREEN, -1));
     Host::addColor(assign_color(COLOR_YELLOW, -1));
@@ -693,6 +710,16 @@ NCursesInterface::NCursesInterface() :
     expand_color = assign_color(COLOR_GREEN, -1);
     highlight_color = assign_color(COLOR_BLACK, COLOR_CYAN);
 
+    redraw_source.set(g_timeout_add(1000, on_redraw_timer, this));
+
+    triggerRedraw();
+}
+
+NCursesInterface::NCursesInterface() :
+    UserInterface()
+{
+    init();
+
     columns.emplace_back(std::make_unique<IDColumn>());
     columns.emplace_back(std::make_unique<NameColumn>());
     columns.emplace_back(std::make_unique<InJobsColumn>());
@@ -704,10 +731,6 @@ NCursesInterface::NCursesInterface() :
     columns.emplace_back(std::make_unique<ActiveJobsColumn>());
     columns.emplace_back(std::make_unique<PendingJobsColumn>());
     columns.emplace_back(std::make_unique<SpeedColumn>());
-
-    redraw_source.set(g_timeout_add(1000, on_redraw_timer, this));
-
-    triggerRedraw();
 }
 
 NCursesInterface::~NCursesInterface()

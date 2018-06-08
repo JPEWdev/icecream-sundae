@@ -42,6 +42,7 @@ public:
 
 private:
     static gboolean scheduler_process(gint fd, GIOCondition condition, gpointer);
+    static gboolean on_reconnect_timer(gpointer);
 
     bool process_message(MsgChannel *sched);
     void discover_scheduler(std::string const &netname, std::string const &schedname);
@@ -51,6 +52,7 @@ private:
     GlibSource scheduler_source;
     std::string current_net_name;
     std::string current_scheduler_name;
+    GlibSource reconnect_source;
 };
 
 gboolean IcecreamScheduler::scheduler_process(gint, GIOCondition, gpointer user_data)
@@ -61,6 +63,9 @@ gboolean IcecreamScheduler::scheduler_process(gint, GIOCondition, gpointer user_
         if (!self->process_message(self->scheduler.get()))
             break;
     }
+
+    if (self->scheduler->at_eof())
+        self->reconnect(self->current_net_name, self->current_scheduler_name);
 
     return TRUE;
 }
@@ -89,7 +94,7 @@ void IcecreamScheduler::discover_scheduler(std::string const &netname, std::stri
             pfd.events = POLLIN;
 
             std::cout << "Waiting " << pfd.fd << std::endl;
-            poll(&pfd, 1, -1);
+            poll(&pfd, 1, 10000);
 
             scheduler.reset(discover->try_get_scheduler());
         }
@@ -180,18 +185,36 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
     return true;
 }
 
+gboolean IcecreamScheduler::on_reconnect_timer(gpointer user_data)
+{
+    auto *self = static_cast<IcecreamScheduler*>(user_data);
+
+    self->reconnect(self->current_net_name, self->current_scheduler_name);
+
+    return TRUE;
+}
+
 void IcecreamScheduler::reconnect(std::string const &netname, std::string const &schedname)
 {
     scheduler.reset();
     scheduler_source.remove();
 
+    if (interface)
+        interface->suspend();
+
     discover_scheduler(netname, schedname);
 
-    if (scheduler)
+    if (scheduler) {
         scheduler_source.set(g_unix_fd_add(scheduler->fd, G_IO_IN, scheduler_process, this));
+        reconnect_source.remove();
+    } else {
+        reconnect_source.set(g_timeout_add(5000, on_reconnect_timer, this));
+    }
 
-    if (interface)
+    if (interface) {
+        interface->resume();
         interface->triggerRedraw();
+    }
 }
 
 
