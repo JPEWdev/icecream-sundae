@@ -1,5 +1,5 @@
 project('icecream-sundae', 'cpp',
-        version: '0.99.0',
+        version: '1.0.0',
         meson_version: '>= 0.31.0',
         default_options: [
             'buildtype=debugoptimized',
