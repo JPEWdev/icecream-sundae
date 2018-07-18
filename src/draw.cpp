@@ -535,7 +535,7 @@ void NCursesInterface::doRender()
     }
     {
         std::ostringstream ss;
-        ss << "Maxiumum:" << total_job_slots << " Active:" << Job::activeJobs.size() <<
+        ss << "Maximum:" << total_job_slots << " Active:" << Job::activeJobs.size() <<
             " Local:" << Job::localJobs.size() << " Pending:" << Job::pendingJobs.size();
         addstr(ss.str().c_str());
     }
