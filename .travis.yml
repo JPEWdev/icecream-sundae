@@ -3,26 +3,34 @@ sudo: required
 language: cpp
 
 compiler:
-    - gcc
-    - clang
+  - gcc
+  - clang
 
 services:
-    - docker
+  - docker
 
 env:
-    - TEST_OS=fedora-28 SANITIZE=address,undefined
-    - TEST_OS=fedora-27 SANITIZE=address,undefined
-    - TEST_OS=ubuntu-bionic SANITIZE=address,undefined
-    - TEST_OS=ubuntu-artful SANITIZE=address,undefined
-    - TEST_OS=ubuntu-xenial SANITIZE=address,undefined
-    - TEST_OS=ubuntu-trusty SANITIZE=none
+  - TEST_OS=fedora-28 SANITIZE=address,undefined COVERALLS=0
+  - TEST_OS=fedora-27 SANITIZE=address,undefined COVERALLS=0
+  - TEST_OS=ubuntu-bionic SANITIZE=address,undefined COVERALLS=0
+  - TEST_OS=ubuntu-artful SANITIZE=address,undefined COVERALLS=0
+  - TEST_OS=ubuntu-xenial SANITIZE=address,undefined COVERALLS=0
+  - TEST_OS=ubuntu-trusty SANITIZE=none COVERALLS=0
+  - TEST_OS=ubuntu-bionic SANITIZE=none COVERALLS=1
+
+matrix:
+    exclude:
+      - compiler: clang
+        env: TEST_OS=ubuntu-bionic SANITIZE=none COVERALLS=1
 
 before_install:
-    - docker build -t icecream-sundae-$TEST_OS -f .travis/$TEST_OS/Dockerfile .
+  - docker build -t icecream-sundae-$TEST_OS -f .travis/$TEST_OS/Dockerfile .
 
 script:
-    - docker run --rm icecream-sundae-$TEST_OS /bin/sh -c "CC=$CC CXX=$CXX
-        meson -Db_ndebug=false -Dwerror=true -Db_sanitize=$SANITIZE .. &&
-        ninja &&
-        ninja test &&
-        ninja install"
+  - docker run --rm --env CC --env CXX
+    --env SANITIZE --env COVERALLS
+    --env TRAVIS_JOB_ID="$TRAVIS_JOB_ID"
+    --env TRAVIS_BRANCH="$TRAVIS_BRANCH"
+    --env COVERALLS_REPO_TOKEN
+    icecream-sundae-$TEST_OS
+    /bin/sh -c "../ci/test_build.sh"

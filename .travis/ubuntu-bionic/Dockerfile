@@ -11,6 +11,15 @@ RUN apt-get -y update && apt-get -y install \
     meson \
     ninja-build
 
+# For coveralls
+RUN apt-get -y update && \
+    apt-get -y install \
+        git-core \
+        lcov \
+        python-pip && \
+    pip install --user cpp-coveralls
+ENV PATH ~/.local/bin:$PATH
+
 RUN mkdir -p /root/icecream-sundae/builddir
 COPY . /root/icecream-sundae/
 WORKDIR /root/icecream-sundae/builddir/
