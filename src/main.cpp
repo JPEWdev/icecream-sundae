@@ -52,6 +52,7 @@ std::map<uint32_t, std::shared_ptr<Host> > Host::hosts;
 static std::string schedname = std::string();
 static std::string netname = std::string();
 static gboolean opt_simulate = FALSE;
+static gboolean opt_anonymize = FALSE;
 static gint opt_sim_seed = 12345;
 static gint opt_sim_cycles = -1;
 static gint opt_sim_speed = 20;
@@ -299,6 +300,7 @@ static bool parse_args(int *argc, char ***argv)
         { "sim-seed", 0, 0, G_OPTION_ARG_INT, &opt_sim_seed, "Simulator seed", NULL },
         { "sim-cycles", 0, 0, G_OPTION_ARG_INT, &opt_sim_cycles, "Number of simulator cycles to run. -1 for no limit", NULL },
         { "sim-speed", 0, 0, G_OPTION_ARG_INT, &opt_sim_speed, "Simulator speed (milliseconds between cycles)", NULL },
+        { "anonymize", 0, 0, G_OPTION_ARG_NONE, &opt_anonymize, "Anonymize hosts and files (for demos)", NULL },
         { "about", 0, 0, G_OPTION_ARG_NONE, &opt_about, "Show about", NULL },
         { "version", 0, 0, G_OPTION_ARG_NONE, &opt_version, "Show version", NULL },
         {}
@@ -385,6 +387,7 @@ int main(int argc, char **argv)
     else
         scheduler = connect_to_scheduler(netname, schedname);
     interface = create_ncurses_interface();
+    interface->set_anonymize(opt_anonymize);
 
     int input_fd = interface->getInputFd();
     GlibSource input_source;

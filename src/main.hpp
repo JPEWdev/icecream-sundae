@@ -192,6 +192,7 @@ public:
     virtual int getInputFd() = 0;
     virtual void suspend() = 0;
     virtual void resume() = 0;
+    virtual void set_anonymize(bool) = 0;
 };
 
 class GlibSource {

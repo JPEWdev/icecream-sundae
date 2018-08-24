@@ -50,6 +50,16 @@ public:
     virtual void suspend() override;
     virtual void resume() override;
 
+    virtual void set_anonymize(bool a) override
+    {
+        anonymize = a;
+    }
+
+    bool get_anonymize() const
+    {
+        return anonymize;
+    }
+
     void print_job_graph(Job::Map const &jobs, int max_jobs) const;
 
 private:
@@ -73,6 +83,7 @@ private:
     bool sort_reversed = false;
     bool track_jobs = false;
     int next_color_id = 1;
+    bool anonymize = false;
 };
 
 struct HostCache {
@@ -150,7 +161,7 @@ class Column {
 
         virtual std::string getHeader() const = 0;
 
-        virtual void output(NCursesInterface const*, int row, const std::shared_ptr<const HostCache> &host) const
+        virtual void output(int row, const std::shared_ptr<const HostCache> &host) const
         {
             move(row, m_column);
             addstr(getOutputString(host).c_str());
@@ -169,7 +180,7 @@ class Column {
         virtual Compare get_compare() const = 0;
 
     protected:
-        Column() {}
+        explicit Column(const NCursesInterface *const interface): m_interface(interface) {}
 
         virtual std::string getOutputString(const std::shared_ptr<const HostCache> &) const
         {
@@ -182,11 +193,12 @@ class Column {
         }
 
         int m_column = -1;
+        const NCursesInterface *const m_interface;
 };
 
 class NameColumn: public Column {
     public:
-        NameColumn() : Column() {}
+        explicit NameColumn(const NCursesInterface *const interface): Column(interface) {}
         virtual ~NameColumn() {}
 
         virtual std::string getHeader() const override
@@ -194,7 +206,7 @@ class NameColumn: public Column {
             return "NAME";
         }
 
-        virtual void output(NCursesInterface const*, int row, const std::shared_ptr<const HostCache> &host) const override
+        virtual void output(int row, const std::shared_ptr<const HostCache> &host) const override
         {
             move(row, m_column);
             {
@@ -212,7 +224,12 @@ class NameColumn: public Column {
         virtual std::string getOutputString(const std::shared_ptr<const HostCache> &host) const override
         {
             std::ostringstream ss;
-            ss << host->host->getName();
+            if (m_interface->get_anonymize()) {
+                ss << std::hex;
+                ss << "Host " << std::hash<std::string>{}(host->host->getName());
+            } else {
+                ss << host->host->getName();
+            }
             return ss.str();
         }
 
@@ -225,7 +242,7 @@ class NameColumn: public Column {
 
 class JobsColumn: public Column {
     public:
-        JobsColumn() : Column() {}
+        explicit JobsColumn(const NCursesInterface *const interface): Column(interface) {}
         virtual ~JobsColumn() {}
 
         virtual size_t getWidth(HostCache::List const &hosts) const override
@@ -243,10 +260,10 @@ class JobsColumn: public Column {
             return "JOBS";
         }
 
-        virtual void output(NCursesInterface const* interface, int row, const std::shared_ptr<const HostCache> &host) const override
+        virtual void output(int row, const std::shared_ptr<const HostCache> &host) const override
         {
             move(row, m_column);
-            interface->print_job_graph(host->current_jobs, host->host->getMaxJobs());
+            m_interface->print_job_graph(host->current_jobs, host->host->getMaxJobs());
         }
 
         virtual Compare get_compare() const override
@@ -264,7 +281,7 @@ class JobsColumn: public Column {
 #define SIMPLE_COLUMN(_name, _header, _attr, _min_width) \
     class _name: public Column { \
         public: \
-            _name() : Column() {} \
+            _name(const NCursesInterface *const interface): Column(interface) {} \
             virtual ~_name() {} \
             virtual std::string getHeader() const override { return _header; } \
             virtual Compare get_compare() const override { return compare; } \
@@ -603,7 +620,7 @@ void NCursesInterface::doRender()
         }
 
         for (auto const &c: columns)
-            c->output(this, row, cache);
+            c->output(row, cache);
 
         if (host->expanded) {
             for (size_t i = 0; i < host->getMaxJobs(); i++) {
@@ -644,10 +661,15 @@ void NCursesInterface::doRender()
                         color = h->getColor();
 
                     Attr clr(COLOR_PAIR(color));
-                    if (job->filename.empty())
+                    if (job->filename.empty()) {
                         addstr("<unknown>");
-                    else
+                    } else if (get_anonymize()) {
+                        std::ostringstream ss;
+                        ss << "Job " << std::hash<std::string>{}(job->filename);
+                        addstr(ss.str().c_str());
+                    } else {
                         addstr(job->filename.c_str());
+                    }
                 }
             }
 
@@ -657,6 +679,9 @@ void NCursesInterface::doRender()
             }
 
             for (auto const &a : host->attr) {
+                if (get_anonymize() && (a.first == "Name" || a.first == "IP"))
+                    continue;
+
                 next_row();
                 move(row, 2);
                 {
@@ -720,17 +745,17 @@ NCursesInterface::NCursesInterface() :
 {
     init();
 
-    columns.emplace_back(std::make_unique<IDColumn>());
-    columns.emplace_back(std::make_unique<NameColumn>());
-    columns.emplace_back(std::make_unique<InJobsColumn>());
-    columns.emplace_back(std::make_unique<CurrentJobsColumn>());
-    columns.emplace_back(std::make_unique<MaxJobsColumn>());
-    columns.emplace_back(std::make_unique<JobsColumn>());
-    columns.emplace_back(std::make_unique<OutJobsColumn>());
-    columns.emplace_back(std::make_unique<LocalJobsColumn>());
-    columns.emplace_back(std::make_unique<ActiveJobsColumn>());
-    columns.emplace_back(std::make_unique<PendingJobsColumn>());
-    columns.emplace_back(std::make_unique<SpeedColumn>());
+    columns.emplace_back(std::make_unique<IDColumn>(this));
+    columns.emplace_back(std::make_unique<NameColumn>(this));
+    columns.emplace_back(std::make_unique<InJobsColumn>(this));
+    columns.emplace_back(std::make_unique<CurrentJobsColumn>(this));
+    columns.emplace_back(std::make_unique<MaxJobsColumn>(this));
+    columns.emplace_back(std::make_unique<JobsColumn>(this));
+    columns.emplace_back(std::make_unique<OutJobsColumn>(this));
+    columns.emplace_back(std::make_unique<LocalJobsColumn>(this));
+    columns.emplace_back(std::make_unique<ActiveJobsColumn>(this));
+    columns.emplace_back(std::make_unique<PendingJobsColumn>(this));
+    columns.emplace_back(std::make_unique<SpeedColumn>(this));
 }
 
 NCursesInterface::~NCursesInterface()
