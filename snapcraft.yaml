@@ -1,0 +1,34 @@
+name:               icecream-sundae
+version:            '1.0.0'
+summary:            icecream-sundae
+description:        |
+  icecream-sundae
+
+base:               core18
+grade:              stable
+confinement:        strict
+
+apps:
+  icecream-sundae:
+    command:        usr/local/bin/icecream-sundae
+    plugs:
+      - network
+
+parts:
+  icecream-sundae:
+    source: https://github.com/JPEWdev/icecream-sundae.git
+    plugin: meson
+    build-packages:
+      - g++
+      - libcap-ng-dev
+      - libglib2.0-dev
+      - libicecc-dev
+      - liblzo2-dev
+      - libncursesw5-dev
+      - meson
+      - ninja-build
+
+
+
+
+
