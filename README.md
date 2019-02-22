@@ -8,7 +8,11 @@ Commandline Monitor for [Icecream](https://github.com/icecc/icecream).
 
 ![Icecream Sundae Demo](/images/demo.gif)
 
-# Building
+# Installation
+
+[![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-black.svg)](https://snapcraft.io/icecream-sundae)
+
+# Building from Source
 
 ## Prerequsites
 * [ncurses](https://www.gnu.org/software/ncurses/ncurses.html)

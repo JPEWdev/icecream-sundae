@@ -2,7 +2,7 @@ name:               icecream-sundae
 version:            '1.0.0'
 summary:            icecream-sundae
 description:        |
-  icecream-sundae
+  Command line monitor for Icecream distributed compiler
 
 base:               core18
 grade:              stable
@@ -27,8 +27,4 @@ parts:
       - libncursesw5-dev
       - meson
       - ninja-build
-
-
-
-
 
