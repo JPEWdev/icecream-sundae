@@ -16,9 +16,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
+#include <cassert>
 
 #include <algorithm>
 #include <cstdint>
+#include <cmath>
 #include <string>
 #include <map>
 #include <memory>
@@ -60,7 +62,7 @@ public:
         return anonymize;
     }
 
-    void print_job_graph(Job::Map const &jobs, int max_jobs) const;
+    void print_job_graph(Job::Map const &jobs, int max_jobs, size_t total_jobs) const;
 
 private:
     static gboolean on_idle_draw(gpointer user_data);
@@ -247,12 +249,7 @@ class JobsColumn: public Column {
 
         virtual size_t getWidth(HostCache::List const &hosts) const override
         {
-            size_t max_width = getHeader().size();
-
-            for (auto const h : hosts)
-                max_width = std::max(max_width, static_cast<size_t>(h->host->getMaxJobs()) + 2);
-
-            return max_width;
+            return m_width;
         }
 
         virtual std::string getHeader() const override
@@ -263,7 +260,7 @@ class JobsColumn: public Column {
         virtual void output(int row, const std::shared_ptr<const HostCache> &host) const override
         {
             move(row, m_column);
-            m_interface->print_job_graph(host->current_jobs, host->host->getMaxJobs());
+            m_interface->print_job_graph(host->current_jobs, std::min(m_width - 2, host->host->getMaxJobs()), host->host->getMaxJobs());
         }
 
         virtual Compare get_compare() const override
@@ -276,6 +273,8 @@ class JobsColumn: public Column {
         {
             return a->current_jobs.size() < b->current_jobs.size();
         }
+    private:
+        const size_t m_width = 5;
 };
 
 #define SIMPLE_COLUMN(_name, _header, _attr, _min_width) \
@@ -409,12 +408,54 @@ void NCursesInterface::resume()
     init();
 }
 
-void NCursesInterface::print_job_graph(Job::Map const &jobs, int max_jobs) const
+void NCursesInterface::print_job_graph(Job::Map const &jobs, int max_jobs, size_t total_jobs) const
 {
+    typedef std::pair<int /* host colour */, bool /*remote job */> BUCKET_KEY;
+    std::map<BUCKET_KEY, size_t /* count */> counts;
+    if(max_jobs < total_jobs) {
+        for (auto const j: jobs) {
+            if(!j.second->active)
+                continue;
+
+            int color = 0;
+            auto const h = j.second->getClient();
+            if (h)
+                color = h->getColor();
+
+            bool remote = !j.second->is_local;
+
+            auto entry = counts.emplace(std::make_pair(color, remote), 0);
+            counts[entry.first->first] = entry.first->second + 1;
+        }
+        //std::sort(counts.begin(), counts.end(), [](const &std::pair<BUCKET_KEY, size_t> lhs, const &std::pair<BUCKET_KEY, size_t> rhs) { return a.second < b.second; });
+
+        float remainder = 0.0;
+        float scale = max_jobs / float(total_jobs);
+        float d_allocated = 0.0;  // for debugging
+        size_t d_all = 0;
+        // scale the counts and track the remainder
+        for(auto e: counts) {
+            d_all += e.second;
+            float scaled_count = e.second * scale;
+            float rounded_count = std::floor(scaled_count);
+            d_allocated += rounded_count;
+            remainder += scaled_count - rounded_count;
+            counts[e.first] = size_t(rounded_count);
+        }
+        assert(((float(d_all) / total_jobs) - ((d_allocated + remainder) / max_jobs)) < 0.005);
+
+        // distribute the remainder amongst the buckets
+        auto bucket = counts.rbegin();
+        for(size_t r = std::ceil(remainder); r > 0; r--) {
+            bucket->second++;
+            bucket++;
+            if(bucket == counts.rend())  // if we're out of buckets restart
+                bucket = counts.rbegin();
+        }
+    }
+
     addch('[');
-
-    int cnt = 0;
-
+    size_t printed = 0;
     for (auto const j : jobs) {
         if (!j.second->active)
             continue;
@@ -423,27 +464,34 @@ void NCursesInterface::print_job_graph(Job::Map const &jobs, int max_jobs) const
         auto const h = j.second->getClient();
         if (h)
             color = h->getColor();
+        bool remote = !j.second->is_local;
 
-        Attr clr(COLOR_PAIR(color));
-        char c;
-        if (track_jobs)  {
-            std::string const *s;
-            if (j.second->is_local)
-                s = &local_job_track;
-            else
-                s = &remote_job_track;
-            c = s->at(j.first % s->size());
-        } else if (j.second->is_local) {
-            c = '%';
-        } else {
-            c = '=';
+        size_t count = counts.empty() ? 1 : counts[std::make_pair(color, remote)];
+
+        // TODO: guarantee this won't overflow max_jobs without the awkward check
+        if(count > 0) {
+            Attr clr(COLOR_PAIR(color));
+            char c;
+            if (track_jobs)  {
+                std::string const *s;
+                if (remote)
+                    s = &remote_job_track;
+                else
+                    s = &local_job_track;
+                c = s->at(j.first % s->size());
+            } else if (remote) {
+                c = '=';
+            } else {
+                c = '%';
+            }
+            addch(c);
+            printed++;
         }
-        addch(c);
-
-        cnt++;
+        if(!counts.empty())
+            counts[std::make_pair(color, remote)] = count - 1;
     }
 
-    for (int i = cnt; i < max_jobs; ++i)
+    for (int i = printed; i < max_jobs; ++i)
         addch(' ');
 
     addch(']');
@@ -559,7 +607,7 @@ void NCursesInterface::doRender()
     next_row();
 
     move(row, 6);
-    print_job_graph(Job::allJobs, total_job_slots);
+    print_job_graph(Job::allJobs, total_job_slots, total_job_slots);
     next_row();
     next_row();
 
