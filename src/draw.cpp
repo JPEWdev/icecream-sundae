@@ -25,8 +25,10 @@
 #include <unordered_set>
 #include <iomanip>
 
+#include <assert.h>
 #include <glib.h>
 #include <glib-unix.h>
+#include <math.h>
 #include <ncurses.h>
 
 #include "main.hpp"
@@ -60,7 +62,7 @@ public:
         return anonymize;
     }
 
-    void print_job_graph(Job::Map const &jobs, int max_jobs) const;
+    void print_job_graph(Job::Map const &jobs, int max_graph_jobs, int max_host_jobs) const;
 
 private:
     static gboolean on_idle_draw(gpointer user_data);
@@ -263,7 +265,7 @@ class JobsColumn: public Column {
         virtual void output(int row, const std::shared_ptr<const HostCache> &host) const override
         {
             move(row, m_column);
-            m_interface->print_job_graph(host->current_jobs, host->host->getMaxJobs());
+            m_interface->print_job_graph(host->current_jobs, host->host->getMaxJobs(), host->host->getMaxJobs());
         }
 
         virtual Compare get_compare() const override
@@ -409,44 +411,118 @@ void NCursesInterface::resume()
     init();
 }
 
-void NCursesInterface::print_job_graph(Job::Map const &jobs, int max_jobs) const
+void NCursesInterface::print_job_graph(Job::Map const &jobs, int max_host_jobs, int max_graph_width) const
 {
-    addch('[');
+    struct Bin {
+        int color = 0;
+        bool is_local = false;
+        int num_jobs = 0;
+        int num_slots = 0;
+        int remainder = 0;
 
-    int cnt = 0;
+        Bin(int color, bool is_local, int num_jobs):
+            color(color), is_local(is_local), num_jobs(num_jobs)
+        {}
+    };
+
+    // Only compress the jobs into a smaller or equal number of slots. Don't
+    // expand them
+    int max_graph_jobs = std::min(max_graph_width - 2, max_host_jobs);
+    bool is_scaled = max_graph_jobs < max_host_jobs;
+
+    std::vector<Bin> bins;
+    int total_active_jobs = 0;
 
     for (auto const j : jobs) {
         if (!j.second->active)
             continue;
+
+        total_active_jobs++;
 
         int color = 0;
         auto const h = j.second->getClient();
         if (h)
             color = h->getColor();
 
-        Attr clr(COLOR_PAIR(color));
-        char c;
-        if (track_jobs)  {
-            std::string const *s;
-            if (j.second->is_local)
-                s = &local_job_track;
-            else
-                s = &remote_job_track;
-            c = s->at(j.first % s->size());
-        } else if (j.second->is_local) {
-            c = '%';
-        } else {
-            c = '=';
-        }
-        addch(c);
+        bool is_local = j.second->is_local;
 
-        cnt++;
+        bool found_bin = false;
+        for (auto& b : bins) {
+            if (b.color == color && b.is_local == is_local) {
+                b.num_jobs++;
+                found_bin = true;
+            }
+        }
+
+        if (!found_bin) {
+            bins.emplace_back(color, is_local, 1);
+        }
     }
 
-    for (int i = cnt; i < max_jobs; ++i)
+    // If there are nodes that do not accept remote jobs but are performing
+    // local compiles, it is possible that the number of active jobs exceeds
+    // the number of host jobs (at least on the master job graph). In these
+    // cases, use the total number of active jobs as the maximum instead of
+    // provided maximum to ensure that the job graph is still scaled in the
+    // event it would exceed the allocated space.
+    max_host_jobs = std::max(total_active_jobs, max_host_jobs);
+
+    int active_graph_slots = ceil(max_graph_jobs * total_active_jobs / (double)max_host_jobs);
+    int used_graph_slots = 0;
+
+    // Calculate the whole and remainder slots for each bin
+    for (auto& b : bins) {
+        b.num_slots = (b.num_jobs * active_graph_slots) / total_active_jobs;
+        b.remainder = (b.num_jobs * active_graph_slots) % total_active_jobs;
+
+        used_graph_slots += b.num_slots;
+    }
+
+    // Add a slot to the bin with the highest remainders until we run out of graph slots
+    std::sort(bins.begin(), bins.end(), [](Bin const& a, Bin const& b) -> bool { return a.remainder > b.remainder; });
+    for (auto& b : bins) {
+        if (used_graph_slots == active_graph_slots || b.remainder == 0)
+            break;
+
+        b.num_slots++;
+        used_graph_slots++;
+    }
+
+    assert(used_graph_slots == active_graph_slots);
+
+    // Sort by color/local to keep the display ordering stable. Otherwise, it
+    // jumps around unpleasantly.
+    std::sort(bins.begin(), bins.end(), [](Bin const& a, Bin const& b) -> bool {
+        if (a.is_local != b.is_local)
+            return a.is_local > b.is_local;
+        return a.color < b.color;
+    });
+
+    if (is_scaled)
+        addch('{');
+    else
+        addch('[');
+
+    int cnt = 0;
+
+    for (auto const& b : bins) {
+        Attr clr(COLOR_PAIR(b.color));
+
+        char c = b.is_local ? '%' : '=';
+
+        for (int i = 0; i < b.num_slots; i++)
+            addch(c);
+
+        cnt += b.num_slots;
+    }
+
+    for (int i = cnt; i < max_graph_jobs; ++i)
         addch(' ');
 
-    addch(']');
+    if (is_scaled)
+        addch('}');
+    else
+        addch(']');
 }
 
 gboolean NCursesInterface::on_idle_draw(gpointer user_data)
@@ -559,7 +635,7 @@ void NCursesInterface::doRender()
     next_row();
 
     move(row, 6);
-    print_job_graph(Job::allJobs, total_job_slots);
+    print_job_graph(Job::allJobs, total_job_slots, screen_cols - 6);
     next_row();
     next_row();
 
