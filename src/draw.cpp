@@ -83,7 +83,6 @@ private:
     uint32_t current_host = 0;
     size_t current_col = 0;
     bool sort_reversed = false;
-    bool track_jobs = false;
     int next_color_id = 1;
     bool anonymize = false;
 };
@@ -351,10 +350,6 @@ int NCursesInterface::processInput()
 
     case '\t':
         current_col = (current_col + 1) % columns.size();
-        break;
-
-    case 'T':
-        track_jobs = !track_jobs;
         break;
 
     case ' ':

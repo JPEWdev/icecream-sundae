@@ -125,7 +125,6 @@ more "Active" jobs than "Maximum" slots, if those nodes are doing local compiles
 | `a`               | Toggle all host details                               |
 | `r`               | Reverse sort                                          |
 | `q`               | Quit                                                  |
-| `T`               | Toggle job tracking (shows jobs with unique letter)   |
 
 # Notes
 
