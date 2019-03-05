@@ -105,7 +105,9 @@ Jobs in the job bar graphs are displayed using the following legend:
 | `%`       | Local compile job     |
 | `=`       | Remote compile job    |
 
-The color of the job marker matches the color of the source node
+The color of the job marker matches the color of the source node. If the job
+graph would be too wide to fit on the screen, it will be scaled down and
+enclosed with curly braces `{}` instead of the normal square braces `[]`.
 
 *Note:* If there are nodes on the cluster that do not accept remote jobs, it is entirely possible that there can be
 more "Active" jobs than "Maximum" slots, if those nodes are doing local compiles

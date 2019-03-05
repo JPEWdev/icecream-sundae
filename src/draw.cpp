@@ -74,7 +74,7 @@ private:
     int assign_color(int fg, int bg);
 
     std::vector<uint32_t> host_order;
-    std::vector<std::unique_ptr<Column> > columns;
+    std::vector<std::shared_ptr<Column> > columns;
     GlibSource idle_source;
     GlibSource redraw_source;
     int header_color;
@@ -150,33 +150,23 @@ class Column {
 
         virtual ~Column() {}
 
-        virtual size_t getWidth(HostCache::List const &hosts) const
+        virtual std::pair<size_t, size_t> getWidthConstraint(HostCache::List const &hosts) const
         {
-            size_t max_width = std::max(getHeader().size(), getMinWidth());
+            size_t min_width = std::max(getHeader().size(), getMinWidth());
 
             for (auto const h : hosts) {
                 std::string s = getOutputString(h);
-                max_width = std::max(max_width, s.size());
+                min_width = std::max(min_width, s.size());
             }
-            return max_width;
+            return std::pair<size_t, size_t>(min_width, min_width);
         }
 
         virtual std::string getHeader() const = 0;
 
-        virtual void output(int row, const std::shared_ptr<const HostCache> &host) const
+        virtual void output(int row, int column, int /* width */, const std::shared_ptr<const HostCache> &host) const
         {
-            move(row, m_column);
+            move(row, column);
             addstr(getOutputString(host).c_str());
-        }
-
-        void setColumn(int col)
-        {
-            m_column = col;
-        }
-
-        int getColumn() const
-        {
-            return m_column;
         }
 
         virtual Compare get_compare() const = 0;
@@ -194,7 +184,6 @@ class Column {
             return 0;
         }
 
-        int m_column = -1;
         const NCursesInterface *const m_interface;
 };
 
@@ -208,9 +197,9 @@ class NameColumn: public Column {
             return "NAME";
         }
 
-        virtual void output(int row, const std::shared_ptr<const HostCache> &host) const override
+        virtual void output(int row, int column, int /* width */, const std::shared_ptr<const HostCache> &host) const override
         {
-            move(row, m_column);
+            move(row, column);
             {
                 Attr attr(COLOR_PAIR(host->host->getColor()) | ( host->host->getNoRemote() ? A_UNDERLINE : 0 ));
                 addstr(getOutputString(host).c_str());
@@ -247,14 +236,15 @@ class JobsColumn: public Column {
         explicit JobsColumn(const NCursesInterface *const interface): Column(interface) {}
         virtual ~JobsColumn() {}
 
-        virtual size_t getWidth(HostCache::List const &hosts) const override
+        virtual std::pair<size_t, size_t> getWidthConstraint(HostCache::List const &hosts) const override
         {
-            size_t max_width = getHeader().size();
+            size_t min_width = getHeader().size();
+            size_t desired_width = min_width;
 
             for (auto const h : hosts)
-                max_width = std::max(max_width, static_cast<size_t>(h->host->getMaxJobs()) + 2);
+                desired_width = std::max(desired_width, static_cast<size_t>(h->host->getMaxJobs()) + 2);
 
-            return max_width;
+            return std::pair<size_t, size_t>(min_width, desired_width);
         }
 
         virtual std::string getHeader() const override
@@ -262,10 +252,10 @@ class JobsColumn: public Column {
             return "JOBS";
         }
 
-        virtual void output(int row, const std::shared_ptr<const HostCache> &host) const override
+        virtual void output(int row, int column, int width, const std::shared_ptr<const HostCache> &host) const override
         {
-            move(row, m_column);
-            m_interface->print_job_graph(host->current_jobs, host->host->getMaxJobs(), host->host->getMaxJobs());
+            move(row, column);
+            m_interface->print_job_graph(host->current_jobs, host->host->getMaxJobs(), width);
         }
 
         virtual Compare get_compare() const override
@@ -639,6 +629,21 @@ void NCursesInterface::doRender()
     next_row();
     next_row();
 
+    struct ColumnView {
+        size_t idx;
+        int col;
+        int width;
+        int min_width;
+        int desired_width;
+        std::shared_ptr<Column> column;
+
+        bool hasSlack() const
+        {
+            return desired_width != min_width;
+        }
+    };
+    std::vector<ColumnView> views;
+
     move(row, 0);
     {
         Attr color(COLOR_PAIR(header_color));
@@ -648,25 +653,74 @@ void NCursesInterface::doRender()
         for (int i = 1; i < screen_cols; i++)
             addch(' ');
 
-        int col = 2;
+        int max_col = 2;
+        int min_col = 2;
+        int slack_cols = 0;
+
         for (size_t i = 0; i < columns.size(); i++) {
             auto &c = columns[i];
-            size_t width = c->getWidth(host_cache);
-            c->setColumn(col);
+            auto width = c->getWidthConstraint(host_cache);
+            ColumnView v;
 
-            if (current_col == i) {
-                color.off();
-                highlight.on();
+            v.idx = i;
+            v.col = max_col;
+            v.width = width.second;
+            v.min_width = width.first;
+            v.desired_width = width.second;
+            v.column = c;
+
+            views.push_back(v);
+
+            max_col += width.second + 1;
+            min_col += width.first + 1;
+
+            if (v.hasSlack())
+                slack_cols++;
+        }
+
+        if (max_col > screen_cols && slack_cols) {
+            // Resize columns
+            int slack_per_col = (screen_cols - min_col) / slack_cols;
+            int extra_slack = (screen_cols - min_col) % slack_cols;
+
+            if (slack_per_col < 0) {
+                slack_per_col = 0;
+                extra_slack = 0;
             }
 
-            mvprintw(row, col, "%-*s", width, c->getHeader().c_str());
-
-            if (current_col == i) {
-                highlight.off();
-                color.on();
+            for (auto& v : views) {
+                if (v.hasSlack()) {
+                    v.width = v.min_width + slack_per_col;
+                    if (extra_slack > 0) {
+                        v.width++;
+                        extra_slack--;
+                    }
+                }
             }
 
-            col += width + 1;
+            // Recalculate positions
+            int col = 2;
+            for (auto& v : views) {
+                v.col = col;
+                col += v.width + 1;
+            }
+        }
+
+        // Draw headers
+        for (auto const& v : views) {
+            if (v.col + v.width <= screen_cols) {
+                if (current_col == v.idx) {
+                    color.off();
+                    highlight.on();
+                }
+
+                mvprintw(row, v.col, "%-*s", v.width, v.column->getHeader().c_str());
+
+                if (current_col == v.idx) {
+                    highlight.off();
+                    color.on();
+                }
+            }
         }
     }
     next_row();
@@ -695,8 +749,10 @@ void NCursesInterface::doRender()
             addch(host->expanded ? '-' : '+');
         }
 
-        for (auto const &c: columns)
-            c->output(row, cache);
+        for (auto const &v: views) {
+            if (v.col + v.width <= screen_cols)
+                v.column->output(row, v.col, v.width, cache);
+        }
 
         if (host->expanded) {
             for (size_t i = 0; i < host->getMaxJobs(); i++) {
