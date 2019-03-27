@@ -1,6 +1,7 @@
 /*
  * Command line Icecream status monitor
  * Copyright (C) 2018 by Garmin Ltd. or its subsidiaries.
+ * Copyright (C) 2019 The Qt Company Ltd. or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -33,6 +34,7 @@
 
 #include "main.hpp"
 #include "draw.hpp"
+#include "all_colors.hpp"
 
 class Column;
 
@@ -850,13 +852,12 @@ void NCursesInterface::init()
     keypad(stdscr, TRUE);
 
     Host::clearColors();
-    Host::addColor(assign_color(COLOR_RED, -1));
-    Host::addColor(assign_color(COLOR_GREEN, -1));
-    Host::addColor(assign_color(COLOR_YELLOW, -1));
-    Host::addColor(assign_color(COLOR_BLUE, -1));
-    Host::addColor(assign_color(COLOR_MAGENTA, -1));
-    Host::addColor(assign_color(COLOR_CYAN, -1));
-    Host::addColor(assign_color(COLOR_WHITE, -1));
+    unsigned color_id = 8;  // The last ncurses predefined color
+    for (auto color: all_colors) {
+        init_color(color_id, std::get<0>(color), std::get<1>(color), std::get<2>(color));
+        Host::addColor(assign_color(color_id, -1));
+        color_id++;
+    }
 
     header_color = assign_color(COLOR_BLACK, COLOR_GREEN);
     expand_color = assign_color(COLOR_GREEN, -1);
