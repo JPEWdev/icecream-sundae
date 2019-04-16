@@ -67,6 +67,10 @@ icecream_sundae = executable('icecream-sundae',
     install : true
     )
 
+install_data('icecream-sundae.desktop',
+    install_dir: join_paths(get_option('datadir'), 'applications')
+    )
+
 # A pretty dumb test right now. Simply run the simulator with a known key for a
 # fixed number of iterations and see if anything breaks
 test('Random simulator test', icecream_sundae, is_parallel: false,

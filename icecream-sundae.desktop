@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=icecream-sundae
+GenericName=Icecream Monitor
+Comment=Commandline Monitor for Icecream
+Exec=icecream-sundae
+Type=Application
+Terminal=true
+Categories=ConsoleOnly;Development;Building;
+Keywords=icecc;icecream;monitor;network;
