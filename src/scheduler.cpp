@@ -1,6 +1,6 @@
 /*
  * Command line Icecream status monitor
- * Copyright (C) 2018 by Garmin Ltd. or its subsidiaries.
+ * Copyright (C) 2018-2019 by Garmin Ltd. or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -93,8 +93,7 @@ void IcecreamScheduler::discover_scheduler(std::string const &netname, std::stri
             pfd.fd = discover->listen_fd();
             pfd.events = POLLIN;
 
-            std::cout << "Waiting " << pfd.fd << std::endl;
-            poll(&pfd, 1, 10000);
+            poll(&pfd, 1, 500);
 
             scheduler.reset(discover->try_get_scheduler());
         }
