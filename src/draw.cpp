@@ -1,6 +1,6 @@
 /*
  * Command line Icecream status monitor
- * Copyright (C) 2018 by Garmin Ltd. or its subsidiaries.
+ * Copyright (C) 2018-2019 by Garmin Ltd. or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -569,15 +569,19 @@ void NCursesInterface::doRender()
     #define next_row() if (++row >= screen_rows) return
 
     move(row, 0);
-    {
-        Attr bold(A_BOLD);
-        addstr("Scheduler: ");
+
+    if (!get_anonymize()) {
+        {
+            Attr bold(A_BOLD);
+            addstr("Scheduler: ");
+        }
+        addstr(scheduler->getSchedulerName().c_str());
+        addch(' ');
     }
-    addstr(scheduler->getSchedulerName().c_str());
 
     {
         Attr bold(A_BOLD);
-        addstr(" Netname: ");
+        addstr("Netname: ");
     }
     addstr(scheduler->getNetName().c_str());
     next_row();
