@@ -10,10 +10,8 @@ services:
   - docker
 
 env:
-  - TEST_OS=fedora-28 SANITIZE=address,undefined COVERALLS=0
-  - TEST_OS=fedora-27 SANITIZE=address,undefined COVERALLS=0
+  - TEST_OS=fedora-30 SANITIZE=address,undefined COVERALLS=0
   - TEST_OS=ubuntu-bionic SANITIZE=address,undefined COVERALLS=0
-  - TEST_OS=ubuntu-artful SANITIZE=address,undefined COVERALLS=0
   - TEST_OS=ubuntu-xenial SANITIZE=address,undefined COVERALLS=0
   - TEST_OS=ubuntu-trusty SANITIZE=none COVERALLS=0
   - TEST_OS=ubuntu-bionic SANITIZE=none COVERALLS=1

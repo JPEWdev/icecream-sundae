@@ -1,4 +1,4 @@
-FROM fedora:27
+FROM fedora:30
 
 RUN dnf -y install \
     clang \
