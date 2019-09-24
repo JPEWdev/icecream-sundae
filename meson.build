@@ -36,6 +36,7 @@ if not cxx.links(code, dependencies: deps, name: 'libicecc links dynamically')
     icecc = dependency('icecc', static: true)
     liblzo2 = cxx.find_library('lzo2')
     libcapng = dependency('libcap-ng', required: false)
+    libzstd = cxx.find_library('zstd', required: false)
     deps += [liblzo2, libcapng, libzstd]
 endif
 
