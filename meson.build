@@ -10,7 +10,9 @@ project('icecream-sundae', 'cpp',
 
 icecc = dependency('icecc')
 glib = dependency('glib-2.0')
+
 ncurses = dependency('ncursesw')
+ncurses_cxxflag = '-DNCURSES_WIDECHAR'
 
 cxx = meson.get_compiler('cpp')
 
@@ -33,8 +35,9 @@ int main(int argc, char **argv)
 if not cxx.links(code, dependencies: deps, name: 'libicecc links dynamically')
     icecc = dependency('icecc', static: true)
     liblzo2 = cxx.find_library('lzo2')
-    libcapng = dependency('libcap-ng')
-    deps += [libcapng, liblzo2]
+    libcapng = dependency('libcap-ng', required: false)
+    libzstd = cxx.find_library('zstd', required: false)
+    deps += [liblzo2, libcapng, libzstd]
 endif
 
 incdir = include_directories('src')
@@ -64,7 +67,8 @@ icecream_sundae = executable('icecream-sundae',
     ['src/main.cpp', 'src/draw.cpp', 'src/scheduler.cpp', 'src/simulator.cpp'],
     include_directories: incdir,
     dependencies: deps,
-    install : true
+    install : true,
+    cpp_args: ncurses_cxxflag
     )
 
 install_data('icecream-sundae.desktop',
