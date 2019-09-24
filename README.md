@@ -59,6 +59,13 @@ python3.5 -m pip install --user meson
 export CXX=g++-6
 ```
 
+### macOS
+
+```shell
+brew install glib ncurses icecream
+export PKG_CONFIG_PATH="/usr/local/opt/ncurses/lib/pkgconfig"
+```
+
 ## Compiling
 To build icecream-sundae, download the latest release, extract it, then run:
 ```
