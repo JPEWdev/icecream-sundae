@@ -829,7 +829,7 @@ void NCursesInterface::doRender()
 
 void NCursesInterface::doRedraw()
 {
-    clear();
+    erase();
     doRender();
     refresh();
 }
