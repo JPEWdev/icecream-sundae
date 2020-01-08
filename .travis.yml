@@ -30,5 +30,6 @@ script:
     --env TRAVIS_JOB_ID="$TRAVIS_JOB_ID"
     --env TRAVIS_BRANCH="$TRAVIS_BRANCH"
     --env COVERALLS_REPO_TOKEN
+    --cap-add SYS_PTRACE
     icecream-sundae-$TEST_OS
     /bin/sh -c "../ci/test_build.sh"
