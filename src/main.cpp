@@ -1,6 +1,6 @@
 /*
  * Command line Icecream status monitor
- * Copyright (C) 2018 by Garmin Ltd. or its subsidiaries.
+ * Copyright (C) 2018-2020 by Garmin Ltd. or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -47,6 +47,7 @@ Job::Map Job::localJobs;
 Job::Map Job::remoteJobs;
 
 std::vector<int> Host::host_color_ids;
+int Host::localhost_color_id;
 std::map<uint32_t, std::shared_ptr<Host> > Host::hosts;
 
 static std::string schedname = std::string();
@@ -274,6 +275,24 @@ Job::Map Host::getCurrentJobs() const
     }
 
     return map;
+}
+
+int Host::getColor() const
+{
+    char buffer[1024];
+
+    if (gethostname(buffer, sizeof(buffer)) == 0 ) {
+        buffer[sizeof(buffer) - 1] = '\0';
+        if (getName() == buffer)
+            return localhost_color_id;
+    }
+
+    return host_color_ids[hashName() % host_color_ids.size()];
+}
+
+size_t Host::hashName() const
+{
+    return std::hash<std::string>{}(getName());
 }
 
 static bool parse_args(int *argc, char ***argv)

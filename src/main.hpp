@@ -1,6 +1,6 @@
 /*
  * Command line Icecream status monitor
- * Copyright (C) 2018 by Garmin Ltd. or its subsidiaries.
+ * Copyright (C) 2018-2020 by Garmin Ltd. or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -113,10 +113,7 @@ struct Host {
         return getBoolAttr("NoRemote");
     }
 
-    int getColor() const
-    {
-        return host_color_ids[std::hash<std::string>{}(getName()) % host_color_ids.size()];
-    }
+    int getColor() const;
 
     static void addColor(int ident)
     {
@@ -126,6 +123,11 @@ struct Host {
     static void clearColors()
     {
         host_color_ids.clear();
+    }
+
+    static void setLocalhostColor(int ident)
+    {
+        localhost_color_id = ident;
     }
 
     static std::shared_ptr<Host> create(uint32_t id);
@@ -168,7 +170,10 @@ private:
         return val;
     }
 
+    size_t hashName() const;
+
     static std::vector<int> host_color_ids;
+    static int localhost_color_id;
 };
 
 class Scheduler {

@@ -1,6 +1,6 @@
 /*
  * Command line Icecream status monitor
- * Copyright (C) 2018-2019 by Garmin Ltd. or its subsidiaries.
+ * Copyright (C) 2018-2020 by Garmin Ltd. or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -855,12 +855,13 @@ void NCursesInterface::init()
 
     Host::clearColors();
     Host::addColor(assign_color(COLOR_RED, -1));
-    Host::addColor(assign_color(COLOR_GREEN, -1));
     Host::addColor(assign_color(COLOR_YELLOW, -1));
     Host::addColor(assign_color(COLOR_BLUE, -1));
     Host::addColor(assign_color(COLOR_MAGENTA, -1));
     Host::addColor(assign_color(COLOR_CYAN, -1));
     Host::addColor(assign_color(COLOR_WHITE, -1));
+
+    Host::setLocalhostColor(assign_color(COLOR_GREEN, -1));
 
     header_color = assign_color(COLOR_BLACK, COLOR_GREEN);
     expand_color = assign_color(COLOR_GREEN, -1);
