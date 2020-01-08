@@ -1,4 +1,4 @@
-FROM ubuntu:artful
+FROM ubuntu:disco
 
 RUN apt-get -y update && apt-get -y install \
     clang \
@@ -14,4 +14,3 @@ RUN apt-get -y update && apt-get -y install \
 RUN mkdir -p /root/icecream-sundae/builddir
 COPY . /root/icecream-sundae/
 WORKDIR /root/icecream-sundae/builddir/
-
