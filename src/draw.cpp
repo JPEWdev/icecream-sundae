@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <iomanip>
 #include <map>
 #include <memory>
 #include <unordered_set>
@@ -345,9 +346,19 @@ struct IDColumn : SimpleColumn {
         : SimpleColumn(nc, "ID", 0, [](const HostCache& hc) { return hc.host->id; }) {}
 };
 
-struct SpeedColumn : SimpleColumn {
+class SpeedColumn : public SimpleColumn {
+private:
+    static auto extract(const HostCache& hc) { return hc.host->getSpeed(); }
+public:
+    // special formatting for speed so the decimal place lines up
     SpeedColumn(const NCursesInterface *nc)
-        : SimpleColumn(nc, "SPEED", 0, [](const HostCache& hc) { return hc.host->getSpeed(); }) {}
+        : SimpleColumn(nc, "SPEED", 8,
+                       [](std::ostream& ss, const HostCache& hc) {
+                           ss << std::fixed << std::setprecision(3) << std::setw(7) << extract(hc);
+                       },
+                       [](const HostCache& a, const HostCache& b) {
+                           return extract(a) < extract(b);
+                       }) {}
 };
 
 static const std::string local_job_track("abcdefghijklmnopqrstuvwxyz");
