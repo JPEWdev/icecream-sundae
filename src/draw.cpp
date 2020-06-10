@@ -155,7 +155,7 @@ class Column {
         {
             size_t min_width = std::max(getHeader().size(), getMinWidth());
 
-            for (auto const h : hosts) {
+            for (auto&& h : hosts) {
                 std::string s = getOutputString(h);
                 min_width = std::max(min_width, s.size());
             }
@@ -175,8 +175,7 @@ class Column {
     protected:
         explicit Column(const NCursesInterface *const interface): m_interface(interface) {}
 
-        virtual std::string getOutputString(const std::shared_ptr<const HostCache> &) const
-        {
+        virtual std::string getOutputString(const std::shared_ptr<const HostCache> &) const {
             return "";
         }
 
@@ -237,7 +236,7 @@ class JobsColumn: public Column {
             size_t min_width = getHeader().size();
             size_t desired_width = min_width;
 
-            for (auto const h : hosts)
+            for (auto&& h : hosts)
                 desired_width = std::max(desired_width, static_cast<size_t>(h->host->getMaxJobs()) + 2);
 
             return std::pair<size_t, size_t>(min_width, desired_width);
@@ -263,11 +262,13 @@ class JobsColumn: public Column {
 
 class SimpleColumn : public Column {
 public:
+    using StreamFunction = std::function<void(std::ostream&, const HostCache&)>;
+
     SimpleColumn(const NCursesInterface *nc,
                  const std::string& header,
                  size_t min_width,
-                 std::function<void(std::ostream&, const HostCache&)> stream,
-                 std::function<bool(const HostCache&, const HostCache&)> compare)
+                 StreamFunction stream,
+                 Compare compare)
         : Column(nc), _header(header), _min_width(min_width), _stream(stream), _compare(compare) {}
 
     template <typename Extract>
@@ -275,22 +276,29 @@ public:
                  const std::string& header,
                  size_t min_width,
                  const Extract& extract)
-    : SimpleColumn(nc,
-                   header,
-                   min_width,
-                   [=](std::ostream& ss, const HostCache& host) {
-                       ss << extract(host);
-                   },
-                   [=](const HostCache& a, const HostCache& b) {
-                       return extract(a) < extract(b);
-                   }) {}
+        : SimpleColumn(nc, header, min_width, makeStreamFunc(extract), makeCompareFunc(extract)) {}
 
     std::string getHeader() const override { return _header; }
 
     Compare get_compare() const override {
         return _compare;
     }
+
 protected:
+    template <typename E>
+    static StreamFunction makeStreamFunc(E extract) {
+        return [=](std::ostream& os, const HostCache& hc) {
+            os << extract(hc);
+        };
+    }
+
+    template <typename E>
+    static Compare makeCompareFunc(E extract) {
+        return [=](const HostCache& a, const HostCache& b) {
+            return extract(a) < extract(b);
+        };
+    }
+
     std::string getOutputString(const std::shared_ptr<const HostCache> &host) const override {
         std::ostringstream ss;
         ss << std::setprecision(6);
@@ -302,63 +310,64 @@ protected:
 
     std::string _header;
     size_t _min_width;
-    std::function<void(std::ostream&, const HostCache&)> _stream;
-    std::function<bool(const HostCache&,const HostCache&)> _compare;
+    StreamFunction _stream;
+    Compare _compare;
 };
 
 struct InJobsColumn : SimpleColumn {
-    InJobsColumn(const NCursesInterface *nc)
-        : SimpleColumn(nc, "IN", 5, [](const HostCache& hc) { return hc.host->total_in; }) {}
+    static decltype(auto) extract(const HostCache& hc) { return hc.host->total_in; }
+    InJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "IN", 5, &extract) {}
 };
 
 struct OutJobsColumn : SimpleColumn {
-    OutJobsColumn(const NCursesInterface *nc)
-        : SimpleColumn(nc, "OUT", 5, [](const HostCache& hc) { return hc.host->total_out; }) {}
+    static decltype(auto) extract(const HostCache& hc) { return hc.host->total_out; }
+    OutJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "OUT", 5, &extract) {}
 };
 
 struct ActiveJobsColumn : SimpleColumn {
-    ActiveJobsColumn(const NCursesInterface *nc)
-        : SimpleColumn(nc, "ACTIVE", 0, [](const HostCache& hc) { return hc.active_jobs.size(); }) {}
+    static decltype(auto) extract(const HostCache& hc) { return hc.active_jobs.size(); }
+    ActiveJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "ACTIVE", 0, &extract) {}
 };
 
 struct PendingJobsColumn : SimpleColumn {
-    PendingJobsColumn(const NCursesInterface *nc)
-        : SimpleColumn(nc, "PENDING", 0, [](const HostCache& hc) { return hc.pending_jobs.size(); }) {}
+    static decltype(auto) extract(const HostCache& hc) { return hc.pending_jobs.size(); }
+    PendingJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "PENDING", 0, &extract) {}
 };
 
 struct LocalJobsColumn : SimpleColumn {
-    LocalJobsColumn(const NCursesInterface *nc)
-        : SimpleColumn(nc, "LOCAL", 5, [](const HostCache& hc) { return hc.host->total_local; }) {}
+    static decltype(auto) extract(const HostCache& hc) { return hc.host->total_local; }
+    LocalJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "LOCAL", 5, &extract) {}
 };
 
 struct CurrentJobsColumn : SimpleColumn {
-    CurrentJobsColumn(const NCursesInterface *nc)
-        : SimpleColumn(nc, "CUR", 0, [](const HostCache& hc) { return hc.current_jobs.size(); }) {}
+    static decltype(auto) extract(const HostCache& hc) { return hc.current_jobs.size(); }
+    CurrentJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "CUR", 0, &extract) {}
 };
 
 struct MaxJobsColumn : SimpleColumn {
-    MaxJobsColumn(const NCursesInterface *nc)
-        : SimpleColumn(nc, "MAX", 0, [](const HostCache& hc) { return hc.host->getMaxJobs(); }) {}
+    static decltype(auto) extract(const HostCache& hc) { return hc.host->getMaxJobs(); }
+    MaxJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "MAX", 0, &extract) {}
 };
 
 struct IDColumn : SimpleColumn {
-    IDColumn(const NCursesInterface *nc)
-        : SimpleColumn(nc, "ID", 0, [](const HostCache& hc) { return hc.host->id; }) {}
+    static decltype(auto) extract(const HostCache& hc) { return hc.host->id; }
+    IDColumn(const NCursesInterface *nc) : SimpleColumn(nc, "ID", 0, &extract) {}
 };
 
 class SpeedColumn : public SimpleColumn {
 private:
-    static auto extract(const HostCache& hc) { return hc.host->getSpeed(); }
+    static decltype(auto) extract(const HostCache& hc) { return hc.host->getSpeed(); }
+
+    // Special formatting for speed so the decimal points line up
+    static void _stream(std::ostream& ss, const HostCache& hc) {
+        ss << std::fixed << std::setprecision(3) << std::setw(7) << extract(hc);
+    }
+
+    static bool _compare(const HostCache& a, const HostCache& b) {
+        return extract(a) < extract(b);
+    }
 public:
-    // special formatting for speed so the decimal place lines up
-    SpeedColumn(const NCursesInterface *nc)
-        : SimpleColumn(nc, "SPEED", 8,
-                       [](std::ostream& ss, const HostCache& hc) {
-                           ss << std::fixed << std::setprecision(3) << std::setw(7) << extract(hc);
-                       },
-                       [](const HostCache& a, const HostCache& b) {
-                           return extract(a) < extract(b);
-                       }) {}
+    SpeedColumn(const NCursesInterface *nc) : SimpleColumn(nc, "SPEED", 8, &_stream, &_compare) {}
 };
 
 static const std::string local_job_track("abcdefghijklmnopqrstuvwxyz");
@@ -421,7 +430,7 @@ int NCursesInterface::processInput()
 
     case 'a':
         all_expanded = !all_expanded;
-        for (auto h : Host::hosts)
+        for (auto&& h : Host::hosts)
             h.second->expanded = all_expanded;
         break;
 
@@ -480,7 +489,7 @@ void NCursesInterface::print_job_graph(Job::Map const &jobs, int max_host_jobs, 
     std::vector<Bin> bins;
     int total_active_jobs = 0;
 
-    for (auto const j : jobs) {
+    for (auto&& j : jobs) {
         if (!j.second->active)
             continue;
 
@@ -607,13 +616,13 @@ void NCursesInterface::doRender()
 
     HostCache::List host_cache;
 
-    for (auto j : Job::allJobs) {
+    for (auto&& j : Job::allJobs) {
         if (j.second->getHost()) {
             used_hosts.insert(j.second->getHost()->id);
         }
     }
 
-    for (auto const h : Host::hosts) {
+    for (auto&& h : Host::hosts) {
         if (!h.second->getNoRemote()) {
             avail_servers++;
             total_job_slots += h.second->getMaxJobs();
@@ -801,7 +810,7 @@ void NCursesInterface::doRender()
 
     host_order.clear();
 
-    for (auto cache: host_cache) {
+    for (auto&& cache : host_cache) {
         auto &host = cache->host;
         if (!host->id)
             continue;
@@ -832,7 +841,7 @@ void NCursesInterface::doRender()
                 std::shared_ptr<Job> job;
 
                 // Find assigned job
-                for (auto j : cache->current_jobs) {
+                for (auto&& j : cache->current_jobs) {
                     if (j.second->host_slot == i) {
                         job = j.second;
                         break;
@@ -841,7 +850,7 @@ void NCursesInterface::doRender()
 
                 // If no existing job was found, assign a new one
                 if (!job) {
-                    for (auto j : cache->current_jobs) {
+                    for (auto&& j : cache->current_jobs) {
                         if (j.second->host_slot == SIZE_MAX) {
                             job = j.second;
                             j.second->host_slot = i;
