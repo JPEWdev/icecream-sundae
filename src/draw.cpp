@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <map>
 #include <memory>
@@ -145,7 +146,7 @@ class Attr {
 
 class Column {
     public:
-        typedef bool (*Compare)(const std::shared_ptr<const HostCache> &, const std::shared_ptr<const HostCache> &);
+        using Compare = std::function<bool(const HostCache&, const HostCache&)>;
 
         virtual ~Column() {}
 
@@ -205,9 +206,10 @@ class NameColumn: public Column {
             }
         }
 
-        virtual Compare get_compare() const override
-        {
-            return compare;
+        Compare get_compare() const override {
+            return [](const HostCache &a, const HostCache &b) {
+                return a.host->getName() < b.host->getName();
+            };
         }
 
     protected:
@@ -221,12 +223,6 @@ class NameColumn: public Column {
                 ss << host->host->getName();
             }
             return ss.str();
-        }
-
-    private:
-        static bool compare(const std::shared_ptr<const HostCache> &a, const std::shared_ptr<const HostCache> &b)
-        {
-            return a->host->getName() < b->host->getName();
         }
 };
 
@@ -257,47 +253,102 @@ class JobsColumn: public Column {
             m_interface->print_job_graph(host->current_jobs, host->host->getMaxJobs(), width);
         }
 
-        virtual Compare get_compare() const override
-        {
-            return compare;
-        }
-
-    private:
-        static bool compare(const std::shared_ptr<const HostCache> &a, const std::shared_ptr<const HostCache> &b)
-        {
-            return a->current_jobs.size() < b->current_jobs.size();
+        Compare get_compare() const override {
+            return [](const HostCache &a, const HostCache &b) {
+                return a.current_jobs.size() < b.current_jobs.size();
+            };
         }
 };
 
-#define SIMPLE_COLUMN(_name, _header, _attr, _min_width) \
-    class _name: public Column { \
-        public: \
-            _name(const NCursesInterface *const interface): Column(interface) {} \
-            virtual ~_name() {} \
-            virtual std::string getHeader() const override { return _header; } \
-            virtual Compare get_compare() const override { return compare; } \
-        protected: \
-            virtual std::string getOutputString(const std::shared_ptr<const HostCache> &host) const override \
-            { \
-                std::ostringstream ss; ss << std::setprecision(6) << host->_attr; return ss.str(); \
-            } \
-            virtual size_t getMinWidth() const override { return _min_width; } \
-        private: \
-            static bool compare(const std::shared_ptr<const HostCache> &a, const std::shared_ptr<const HostCache> &b) \
-            { \
-                return a->_attr < b->_attr; \
-            } \
+class SimpleColumn : public Column {
+public:
+    SimpleColumn(const NCursesInterface *nc,
+                 const std::string& header,
+                 size_t min_width,
+                 std::function<void(std::ostream&, const HostCache&)> stream,
+                 std::function<bool(const HostCache&, const HostCache&)> compare)
+        : Column(nc), _header(header), _min_width(min_width), _stream(stream), _compare(compare) {}
+
+    template <typename Extract>
+    SimpleColumn(const NCursesInterface *nc,
+                 const std::string& header,
+                 size_t min_width,
+                 const Extract& extract)
+    : SimpleColumn(nc,
+                   header,
+                   min_width,
+                   [=](std::ostream& ss, const HostCache& host) {
+                       ss << extract(host);
+                   },
+                   [=](const HostCache& a, const HostCache& b) {
+                       return extract(a) < extract(b);
+                   }) {}
+
+    std::string getHeader() const override { return _header; }
+
+    Compare get_compare() const override {
+        return _compare;
+    }
+protected:
+    std::string getOutputString(const std::shared_ptr<const HostCache> &host) const override {
+        std::ostringstream ss;
+        ss << std::setprecision(6);
+        _stream(ss, *host);
+        return ss.str();
     }
 
-SIMPLE_COLUMN(InJobsColumn, "IN", host->total_in, 5);
-SIMPLE_COLUMN(OutJobsColumn, "OUT", host->total_out, 5);
-SIMPLE_COLUMN(ActiveJobsColumn, "ACTIVE", active_jobs.size(), 0);
-SIMPLE_COLUMN(PendingJobsColumn, "PENDING", pending_jobs.size(), 0);
-SIMPLE_COLUMN(LocalJobsColumn, "LOCAL", host->total_local, 5);
-SIMPLE_COLUMN(CurrentJobsColumn, "CUR", current_jobs.size(), 0);
-SIMPLE_COLUMN(MaxJobsColumn, "MAX", host->getMaxJobs(), 0);
-SIMPLE_COLUMN(IDColumn, "ID", host->id, 0);
-SIMPLE_COLUMN(SpeedColumn, "SPEED", host->getSpeed(), 0);
+    size_t getMinWidth() const override { return _min_width; }
+
+    std::string _header;
+    size_t _min_width;
+    std::function<void(std::ostream&, const HostCache&)> _stream;
+    std::function<bool(const HostCache&,const HostCache&)> _compare;
+};
+
+struct InJobsColumn : SimpleColumn {
+    InJobsColumn(const NCursesInterface *nc)
+        : SimpleColumn(nc, "IN", 5, [](const HostCache& hc) { return hc.host->total_in; }) {}
+};
+
+struct OutJobsColumn : SimpleColumn {
+    OutJobsColumn(const NCursesInterface *nc)
+        : SimpleColumn(nc, "OUT", 5, [](const HostCache& hc) { return hc.host->total_out; }) {}
+};
+
+struct ActiveJobsColumn : SimpleColumn {
+    ActiveJobsColumn(const NCursesInterface *nc)
+        : SimpleColumn(nc, "ACTIVE", 0, [](const HostCache& hc) { return hc.active_jobs.size(); }) {}
+};
+
+struct PendingJobsColumn : SimpleColumn {
+    PendingJobsColumn(const NCursesInterface *nc)
+        : SimpleColumn(nc, "PENDING", 0, [](const HostCache& hc) { return hc.pending_jobs.size(); }) {}
+};
+
+struct LocalJobsColumn : SimpleColumn {
+    LocalJobsColumn(const NCursesInterface *nc)
+        : SimpleColumn(nc, "LOCAL", 5, [](const HostCache& hc) { return hc.host->total_local; }) {}
+};
+
+struct CurrentJobsColumn : SimpleColumn {
+    CurrentJobsColumn(const NCursesInterface *nc)
+        : SimpleColumn(nc, "CUR", 0, [](const HostCache& hc) { return hc.current_jobs.size(); }) {}
+};
+
+struct MaxJobsColumn : SimpleColumn {
+    MaxJobsColumn(const NCursesInterface *nc)
+        : SimpleColumn(nc, "MAX", 0, [](const HostCache& hc) { return hc.host->getMaxJobs(); }) {}
+};
+
+struct IDColumn : SimpleColumn {
+    IDColumn(const NCursesInterface *nc)
+        : SimpleColumn(nc, "ID", 0, [](const HostCache& hc) { return hc.host->id; }) {}
+};
+
+struct SpeedColumn : SimpleColumn {
+    SpeedColumn(const NCursesInterface *nc)
+        : SimpleColumn(nc, "SPEED", 0, [](const HostCache& hc) { return hc.host->getSpeed(); }) {}
+};
 
 static const std::string local_job_track("abcdefghijklmnopqrstuvwxyz");
 static const std::string remote_job_track("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
@@ -725,11 +776,16 @@ void NCursesInterface::doRender()
     next_row();
 
     if (current_col < columns.size()) {
-        auto compare = columns[current_col]->get_compare();
-        if (sort_reversed)
-            std::sort(host_cache.rbegin(), host_cache.rend(), compare);
-        else
-            std::sort(host_cache.begin(), host_cache.end(), compare);
+        auto raw_compare = columns[current_col]->get_compare();
+        auto compare = [&](const std::shared_ptr<const HostCache>& a,
+                           const std::shared_ptr<const HostCache>& b) {
+            if (sort_reversed) {
+                return raw_compare(*a, *b);
+            } else {
+                return raw_compare(*b, *a);
+            }
+        };
+        std::sort(host_cache.begin(), host_cache.end(), compare);
     }
 
     host_order.clear();
