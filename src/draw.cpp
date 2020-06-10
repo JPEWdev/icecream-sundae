@@ -319,42 +319,42 @@ protected:
 
 struct InJobsColumn : SimpleColumn {
     static decltype(auto) extract(const HostCache& hc) { return hc.host->total_in; }
-    InJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "IN", 5, &extract) {}
+    explicit InJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "IN", 5, &extract) {}
 };
 
 struct OutJobsColumn : SimpleColumn {
     static decltype(auto) extract(const HostCache& hc) { return hc.host->total_out; }
-    OutJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "OUT", 5, &extract) {}
+    explicit OutJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "OUT", 5, &extract) {}
 };
 
 struct ActiveJobsColumn : SimpleColumn {
     static decltype(auto) extract(const HostCache& hc) { return hc.active_jobs.size(); }
-    ActiveJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "ACTIVE", 0, &extract) {}
+    explicit ActiveJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "ACTIVE", 0, &extract) {}
 };
 
 struct PendingJobsColumn : SimpleColumn {
     static decltype(auto) extract(const HostCache& hc) { return hc.pending_jobs.size(); }
-    PendingJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "PENDING", 0, &extract) {}
+    explicit PendingJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "PENDING", 0, &extract) {}
 };
 
 struct LocalJobsColumn : SimpleColumn {
     static decltype(auto) extract(const HostCache& hc) { return hc.host->total_local; }
-    LocalJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "LOCAL", 5, &extract) {}
+    explicit LocalJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "LOCAL", 5, &extract) {}
 };
 
 struct CurrentJobsColumn : SimpleColumn {
     static decltype(auto) extract(const HostCache& hc) { return hc.current_jobs.size(); }
-    CurrentJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "CUR", 0, &extract) {}
+    explicit CurrentJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "CUR", 0, &extract) {}
 };
 
 struct MaxJobsColumn : SimpleColumn {
     static decltype(auto) extract(const HostCache& hc) { return hc.host->getMaxJobs(); }
-    MaxJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "MAX", 0, &extract) {}
+    explicit MaxJobsColumn(const NCursesInterface *nc) : SimpleColumn(nc, "MAX", 0, &extract) {}
 };
 
 struct IDColumn : SimpleColumn {
     static decltype(auto) extract(const HostCache& hc) { return hc.host->id; }
-    IDColumn(const NCursesInterface *nc) : SimpleColumn(nc, "ID", 0, &extract) {}
+    explicit IDColumn(const NCursesInterface *nc) : SimpleColumn(nc, "ID", 0, &extract) {}
 };
 
 class SpeedColumn : public SimpleColumn {
@@ -370,7 +370,7 @@ private:
         return extract(a) < extract(b);
     }
 public:
-    SpeedColumn(const NCursesInterface *nc) : SimpleColumn(nc, "SPEED", 8, &_stream, &_compare) {}
+    explicit SpeedColumn(const NCursesInterface *nc) : SimpleColumn(nc, "SPEED", 8, &_stream, &_compare) {}
 };
 
 static const std::string local_job_track("abcdefghijklmnopqrstuvwxyz");
