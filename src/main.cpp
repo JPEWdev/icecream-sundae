@@ -245,7 +245,7 @@ Job::Map Host::getPendingJobs() const
 {
     Job::Map map;
 
-    for (auto j : Job::pendingJobs) {
+    for (auto&& j : Job::pendingJobs) {
         if (j.second->clientid == id)
             map[j.first] = j.second;
     }
@@ -257,7 +257,7 @@ Job::Map Host::getActiveJobs() const
 {
     Job::Map map;
 
-    for (auto j : Job::activeJobs) {
+    for (auto&& j : Job::activeJobs) {
         if (j.second->clientid == id)
             map[j.first] = j.second;
     }
@@ -269,7 +269,7 @@ Job::Map Host::getCurrentJobs() const
 {
     Job::Map map;
 
-    for (auto j : Job::activeJobs) {
+    for (auto&& j : Job::activeJobs) {
         if (j.second->hostid == id)
             map[j.first] = j.second;
     }
