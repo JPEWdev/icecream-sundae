@@ -175,7 +175,8 @@ class Column {
     protected:
         explicit Column(const NCursesInterface *const interface): m_interface(interface) {}
 
-        virtual std::string getOutputString(const std::shared_ptr<const HostCache> &) const {
+        virtual std::string getOutputString(const std::shared_ptr<const HostCache> &) const
+        {
             return "";
         }
 
@@ -206,7 +207,8 @@ class NameColumn: public Column {
             }
         }
 
-        Compare get_compare() const override {
+        virtual Compare get_compare() const override
+        {
             return [](const HostCache &a, const HostCache &b) {
                 return a.host->getName() < b.host->getName();
             };
@@ -253,7 +255,8 @@ class JobsColumn: public Column {
             m_interface->print_job_graph(host->current_jobs, host->host->getMaxJobs(), width);
         }
 
-        Compare get_compare() const override {
+        virtual Compare get_compare() const override
+        {
             return [](const HostCache &a, const HostCache &b) {
                 return a.current_jobs.size() < b.current_jobs.size();
             };
@@ -796,14 +799,10 @@ void NCursesInterface::doRender()
     next_row();
 
     if (current_col < columns.size()) {
-        auto raw_compare = columns[current_col]->get_compare();
+        auto ascending = columns[current_col]->get_compare();
         auto compare = [&](const std::shared_ptr<const HostCache>& a,
                            const std::shared_ptr<const HostCache>& b) {
-            if (sort_reversed) {
-                return raw_compare(*a, *b);
-            } else {
-                return raw_compare(*b, *a);
-            }
+            return sort_reversed ? ascending(*b, *a) : ascending(*a, *b);
         };
         std::sort(host_cache.begin(), host_cache.end(), compare);
     }
