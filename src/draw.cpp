@@ -153,7 +153,7 @@ class Column {
         {
             size_t min_width = std::max(getHeader().size(), getMinWidth());
 
-            for (auto const h : hosts) {
+            for (auto const &h : hosts) {
                 std::string s = getOutputString(h);
                 min_width = std::max(min_width, s.size());
             }
@@ -240,7 +240,7 @@ class JobsColumn: public Column {
             size_t min_width = getHeader().size();
             size_t desired_width = min_width;
 
-            for (auto const h : hosts)
+            for (auto const &h : hosts)
                 desired_width = std::max(desired_width, static_cast<size_t>(h->host->getMaxJobs()) + 2);
 
             return std::pair<size_t, size_t>(min_width, desired_width);
@@ -418,7 +418,7 @@ void NCursesInterface::print_job_graph(Job::Map const &jobs, int max_host_jobs, 
     std::vector<Bin> bins;
     int total_active_jobs = 0;
 
-    for (auto const j : jobs) {
+    for (auto const &j : jobs) {
         if (!j.second->active)
             continue;
 
@@ -545,13 +545,13 @@ void NCursesInterface::doRender()
 
     HostCache::List host_cache;
 
-    for (auto j : Job::allJobs) {
+    for (auto &j : Job::allJobs) {
         if (j.second->getHost()) {
             used_hosts.insert(j.second->getHost()->id);
         }
     }
 
-    for (auto const h : Host::hosts) {
+    for (auto const &h : Host::hosts) {
         if (!h.second->getNoRemote()) {
             avail_servers++;
             total_job_slots += h.second->getMaxJobs();
@@ -759,7 +759,7 @@ void NCursesInterface::doRender()
                 move(row, 2);
                 {
                     Attr bold(A_BOLD);
-                    printw("Job %d: ", i + 1);
+                    printw("Job %ld: ", i + 1);
                 }
 
                 std::shared_ptr<Job> job;
