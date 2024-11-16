@@ -98,7 +98,7 @@ template<typename T>
 std::shared_ptr<T> Simulator::chooseRandom(std::map<uint32_t, std::shared_ptr<T> > const &map)
 {
     std::vector<std::shared_ptr<T> > items;
-    for (auto const m : map)
+    for (auto const &m : map)
         items.push_back(m.second);
 
     if (!items.size())
@@ -227,7 +227,7 @@ Host::Map Simulator::getAvailableHosts(uint32_t except) const
 {
     Host::Map result;
 
-    for (auto h : Host::hosts) {
+    for (auto &h : Host::hosts) {
         if (h.first != except && h.second->getCurrentJobs().size() < h.second->getMaxJobs())
             result[h.first] = h.second;
     }
