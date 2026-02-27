@@ -28,6 +28,12 @@
 #include "main.hpp"
 #include "scheduler.hpp"
 
+#if ICECC_TEST_USE_OLD_MSG_API
+#define ICECC_MSG_API_COMPAT(old, new) old
+#else
+#define ICECC_MSG_API_COMPAT(old, new) new
+#endif
+
 class IcecreamScheduler: public Scheduler {
 public:
     IcecreamScheduler(std::string const &netname, std::string const &schedname) : Scheduler()
@@ -125,33 +131,33 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
     if (!msg)
         return false;
 
-    switch (msg->type) {
-    case M_MON_LOCAL_JOB_BEGIN: {
+    switch (ICECC_MSG_API_COMPAT(msg->type, *msg)) {
+    case ICECC_MSG_API_COMPAT(M_MON_LOCAL_JOB_BEGIN, Msg::MON_LOCAL_JOB_BEGIN): {
         auto *m = dynamic_cast<MonLocalJobBeginMsg*>(msg.get());
         Job::createLocal(m->job_id, m->hostid, m->file);
         break;
     }
-    case M_JOB_LOCAL_DONE: {
+    case ICECC_MSG_API_COMPAT(M_JOB_LOCAL_DONE, Msg::JOB_LOCAL_DONE): {
         auto *m = dynamic_cast<JobLocalDoneMsg*>(msg.get());
         Job::remove(m->job_id);
         break;
     }
-    case M_MON_JOB_BEGIN: {
+    case ICECC_MSG_API_COMPAT(M_MON_JOB_BEGIN, Msg::MON_JOB_BEGIN): {
         auto *m = dynamic_cast<MonJobBeginMsg*>(msg.get());
         Job::createRemote(m->job_id, m->hostid);
         break;
     }
-    case M_MON_JOB_DONE: {
+    case ICECC_MSG_API_COMPAT(M_MON_JOB_DONE, Msg::MON_JOB_DONE): {
         auto *m = dynamic_cast<MonJobDoneMsg*>(msg.get());
         Job::remove(m->job_id);
         break;
     }
-    case M_MON_GET_CS: {
+    case ICECC_MSG_API_COMPAT(M_MON_GET_CS, Msg::MON_GET_CS): {
         auto *m = dynamic_cast<MonGetCSMsg*>(msg.get());
         Job::createPending(m->job_id, m->clientid, m->filename);
         break;
     }
-    case M_MON_STATS: {
+    case ICECC_MSG_API_COMPAT(M_MON_STATS, Msg::MON_STATS): {
         auto *m = dynamic_cast<MonStatsMsg*>(msg.get());
         auto host = Host::create(m->hostid);
 
@@ -174,7 +180,7 @@ bool IcecreamScheduler::process_message(MsgChannel *sched)
             interface->triggerRedraw();
         break;
     }
-    case M_END:
+    case ICECC_MSG_API_COMPAT(M_END, Msg::END):
         reconnect(current_net_name, current_scheduler_name);
         break;
     default:
