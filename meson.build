@@ -55,8 +55,17 @@ int main(int argc, char **argv) {
 }
 '''
 
-if not cxx.links(code, dependencies: deps, name: 'libicecc C++11 compatability')
+if not cxx.links(code, dependencies: deps, name: 'libicecc C++11 compatibility')
     add_global_arguments('-D_GLIBCXX_USE_CXX11_ABI=0', language: 'cpp')
+endif
+
+code  = '''
+      #include <icecc/comm.h>
+
+      int main() { Msg msg(M_MON_GET_CS); (void)msg.type; }
+      '''
+if cxx.links(code, dependencies: deps, name: 'old icecc api compatibility')
+    add_global_arguments('-DICECC_TEST_USE_OLD_MSG_API=1', language: 'cpp')
 endif
 
 conf_data = configuration_data()
